@@ -1,9 +1,14 @@
 plugins {
     id 'java'
+    id 'application'
 }
 
 group = 'com.pavelkuzmin'
 version = '1.0-SNAPSHOT'
+
+application {
+    mainClass = 'com.pavelkuzmin.sortit.Main'
+}
 
 repositories {
     mavenCentral()
