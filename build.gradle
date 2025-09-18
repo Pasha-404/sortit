@@ -1,12 +1,18 @@
 plugins {
     id 'java'
     id 'application'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
 group = 'com.pavelkuzmin'
-version = '1.0-SNAPSHOT'
+version = '0.1.0'
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(23) }
+}
 
 application {
+    // Точка входа
     mainClass = 'com.pavelkuzmin.sortit.Main'
 }
 
@@ -15,10 +21,57 @@ repositories {
 }
 
 dependencies {
-    testImplementation platform('org.junit:junit-bom:5.10.0')
-    testImplementation 'org.junit.jupiter:junit-jupiter'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.1'
+    implementation 'com.fasterxml.jackson.core:jackson-annotations:2.17.1'
+    implementation 'com.fasterxml.jackson.core:jackson-core:2.17.1'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
 }
 
 test {
     useJUnitPlatform()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// --- Сборка "толстого" JAR для запуска и упаковки ---
+tasks.shadowJar {
+    archiveClassifier.set('all')
+}
+
+// --- Упаковка в Windows-папку приложения с .exe (без установки) ---
+tasks.register('makeAppImage', Exec) {
+    dependsOn tasks.shadowJar
+    doFirst {
+        file("${buildDir}/jpackage").mkdirs()
+    }
+    commandLine = [
+            "${System.properties['java.home']}/bin/jpackage",
+            '--type', 'app-image',
+            '--name', 'SortIt',
+            '--app-version', "${project.version}",
+            '--input', "${buildDir}/libs",
+            '--main-jar', "${project.name}-${project.version}-all.jar",
+            '--dest', "${buildDir}/jpackage",
+            '--vendor', 'SortIt',
+            '--icon', "${project.projectDir}/src/main/resources/app-icon.ico"
+    ]
+}
+
+// --- Упаковка в обычный установщик .exe (если захочешь инсталлятор) ---
+tasks.register('makeExe', Exec) {
+    dependsOn tasks.shadowJar
+    commandLine = [
+            "${System.properties['java.home']}/bin/jpackage",
+            '--type', 'exe',
+            '--name', 'SortIt',
+            '--app-version', "${project.version}",
+            '--input', "${buildDir}/libs",
+            '--main-jar', "${project.name}-${project.version}-all.jar",
+            '--dest', "${buildDir}/jpackage",
+            '--vendor', 'SortIt',
+            '--win-dir-chooser',
+            '--icon', "${project.projectDir}/src/main/resources/app-icon.ico"
+    ]
 }

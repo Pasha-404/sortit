@@ -1,338 +1,278 @@
 package com.pavelkuzmin.sortit.ui;
 
+import com.pavelkuzmin.sortit.config.AppConfig;
+import com.pavelkuzmin.sortit.config.ConfigIO;
+import com.pavelkuzmin.sortit.core.FileFinder;
+import com.pavelkuzmin.sortit.i18n.Strings;
+import com.pavelkuzmin.sortit.ui.dialogs.LogViewerDialog;
+import com.pavelkuzmin.sortit.ui.panels.DestPanel;
+import com.pavelkuzmin.sortit.ui.panels.SourcePanel;
+
 import javax.swing.*;
-import javax.swing.border.TitledBorder;
-import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.text.MessageFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class MainFrame extends JFrame {
 
-    // Поля UI (понадобятся дальше для логики)
-    private final JTextField txtSource = new JTextField();
-    private final JTextField txtDest = new JTextField();
-    private final JButton btnBrowseSource = new JButton("Выбрать...");
-    private final JButton btnBrowseDest = new JButton("Выбрать...");
+    private final JComboBox<String> cmbLang = new JComboBox<>(new String[]{"RU", "EN"}); // пока выключено
+    private final SourcePanel sourcePanel = new SourcePanel();
+    private final DestPanel destPanel = new DestPanel();
 
-    private final JComboBox<String> cmbFileMask = new JComboBox<>(new String[]{"*.jpg", "*.png", "*.mp4", "*.mov", "*.pdf"});
-    private final JCheckBox chkNoRecursion = new JCheckBox("Без подпапок (нет рекурсии)", true);
+    private final JButton btnSortIt = new JButton(Strings.get("run.button"));
+    private final JCheckBox chkShowResults = new JCheckBox(Strings.get("run.showResult"), false);
 
-    private final JTextField txtTemplate = new JTextField("{YYYY}/{MM}/{DD}");
-    private final JComboBox<String> cmbDateSource = new JComboBox<>(new String[]{
-            "Только из имени файла (по умолчанию)", "Advanced…"
-    });
-    private final JComboBox<String> cmbIfNoDate = new JComboBox<>(new String[]{"Пропустить файл", "Положить в Unsorted/"}); // default index 0
-
-    private final JRadioButton rbMove = new JRadioButton("Перенос", true);
-    private final JRadioButton rbCopy = new JRadioButton("Копирование");
-    private final JCheckBox chkDryRun = new JCheckBox("Пробный запуск (без перемещения)", true);
-    private final JCheckBox chkWriteLog = new JCheckBox("Писать лог (sort-YYYYMMDD-HHMM.csv рядом с .exe)");
-
-    private final JButton btnPreview = new JButton("Предпросмотр");
-    private final JButton btnStart = new JButton("Старт");
-    private final JButton btnPause = new JButton("Пауза");
-    private final JButton btnStop = new JButton("Стоп");
-
-    private final JLabel lblSummary = new JLabel("Найдено: 0 • К обработке: 0 • Пропущено: 0");
     private final JProgressBar progress = new JProgressBar(0, 100);
+    private final JLabel lblStatus = new JLabel(Strings.get("status.ready"));
 
-    private final DefaultTableModel tableModel = new DefaultTableModel(
-            new Object[]{"Имя файла", "Откуда", "Куда (предпросмотр)", "Действие", "Статус", "Сообщение"}, 0
-    ) {
-        @Override public boolean isCellEditable(int row, int column) { return false; }
-    };
-    private final JTable table = new JTable(tableModel);
-
-    private final JButton btnOpenDest = new JButton("Открыть назначение");
-    private final JButton btnOpenLog = new JButton("Открыть лог");
-    private final JLabel lblVersion = new JLabel("v0.1.0");
-
-    // Снимок значений UI (на будущее для логики)
-    private Map<String, Object> getUiSnapshot() {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("source", txtSource.getText().trim());
-        m.put("dest", txtDest.getText().trim());
-        m.put("fileMask", (String) cmbFileMask.getSelectedItem());
-        m.put("noRecursion", chkNoRecursion.isSelected());
-        m.put("template", txtTemplate.getText().trim());
-        m.put("dateSource", (String) cmbDateSource.getSelectedItem());
-        m.put("ifNoDate", (String) cmbIfNoDate.getSelectedItem());
-        m.put("mode", rbMove.isSelected() ? "move" : "copy");
-        m.put("dryRun", chkDryRun.isSelected());
-        m.put("writeLog", chkWriteLog.isSelected());
-        return m;
-    }
-
-    // Простая валидация обязательных полей
-    private boolean validateInputs() {
-        String src = txtSource.getText().trim();
-        String dst = txtDest.getText().trim();
-
-        if (src.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Укажите исходную папку.", "SortIt", JOptionPane.WARNING_MESSAGE);
-            txtSource.requestFocus();
-            return false;
-        }
-        if (dst.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Укажите папку назначения.", "SortIt", JOptionPane.WARNING_MESSAGE);
-            txtDest.requestFocus();
-            return false;
-        }
-        try {
-            if (!Files.isDirectory(Path.of(src))) {
-                JOptionPane.showMessageDialog(this, "Исходная папка не существует.", "SortIt", JOptionPane.WARNING_MESSAGE);
-                txtSource.requestFocus();
-                return false;
-            }
-        } catch (Exception ignored) { }
-
-        // Назначение может не существовать — создадим позже; но путь должен быть валидным
-        try { Path.of(dst); } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Некорректный путь назначения.", "SortIt", JOptionPane.WARNING_MESSAGE);
-            txtDest.requestFocus();
-            return false;
-        }
-        return true;
-    }
-
-    // Переключение кнопок при запуске/остановке
-    private void setRunningState(boolean running) {
-        btnPreview.setEnabled(!running);
-        btnStart.setEnabled(!running);
-        btnPause.setEnabled(running);
-        btnStop.setEnabled(running);
-    }
-
-    // Открыть папку в Проводнике
-    private void openFolder(String path) {
-        try {
-            if (path == null || path.isBlank()) return;
-            Desktop.getDesktop().open(new File(path));
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Не удалось открыть: " + path, "SortIt", JOptionPane.ERROR_MESSAGE);
-        }
-    }
+    private final FileFinder finder = new FileFinder();
+    private AppConfig config = ConfigIO.loadOrDefaults();
 
     public MainFrame() {
-        super("SortIt");
+        super(Strings.get("app.title"));
+
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-        setMinimumSize(new Dimension(1000, 700));
+        setMinimumSize(new Dimension(480, 480));
         setLocationByPlatform(true);
 
-        // Верхняя часть (формы)
-        JPanel top = new JPanel();
-        top.setLayout(new BoxLayout(top, BoxLayout.Y_AXIS));
-        top.add(makeSourceDestPanel());
-        top.add(Box.createVerticalStrut(8));
-        top.add(makeTemplatePanel());
-        top.add(Box.createVerticalStrut(8));
-        top.add(makeModePanel());
-        top.add(Box.createVerticalStrut(8));
-        top.add(makeActionsPanel());
+        // Иконка окна
+        try {
+            var iconUrl = getClass().getResource("/app-icon.png");
+            if (iconUrl != null) setIconImage(new ImageIcon(iconUrl).getImage());
+        } catch (Exception ignored) {}
 
-        // Центр — таблица
-        JScrollPane center = new JScrollPane(table);
-        table.setFillsViewportHeight(true);
-        table.setRowHeight(22);
+        // ===== Верх: только язык справа =====
+        JPanel header = new JPanel(new BorderLayout(6, 6));
+        JPanel langPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 6));
+        cmbLang.setEnabled(false);
+        langPanel.add(new JLabel(Strings.get("lang.label")));
+        langPanel.add(cmbLang);
+        header.add(langPanel, BorderLayout.EAST);
 
-        // Низ — прогресс и футер
-        JPanel bottom = new JPanel(new BorderLayout(8, 8));
+        // ===== Центр: Источник → Назначение → кнопка+чекбокс =====
+        JPanel center = new JPanel();
+        center.setLayout(new BoxLayout(center, BoxLayout.Y_AXIS));
+        center.add(header);
+        center.add(Box.createVerticalStrut(6));
+        center.add(sourcePanel);
+        center.add(Box.createVerticalStrut(6));
+        center.add(destPanel);
+        center.add(Box.createVerticalStrut(8));
+
+        JPanel actionRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 4));
+        btnSortIt.setFont(btnSortIt.getFont().deriveFont(Font.BOLD, 16f));
+        btnSortIt.setPreferredSize(new Dimension(180, 40));
+        actionRow.add(btnSortIt);
+        actionRow.add(chkShowResults);
+        center.add(actionRow);
+
+        JPanel statusBar = new JPanel(new BorderLayout(6, 6));
         progress.setStringPainted(true);
-        bottom.add(progress, BorderLayout.NORTH);
+        statusBar.add(progress, BorderLayout.NORTH);
+        statusBar.add(lblStatus, BorderLayout.SOUTH);
 
-        JPanel footer = new JPanel(new BorderLayout());
-        JPanel footerLeft = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        footerLeft.add(btnOpenDest);
-        footerLeft.add(btnOpenLog);
-        footer.add(footerLeft, BorderLayout.WEST);
-        lblVersion.setForeground(new Color(110, 110, 110));
-        footer.add(lblVersion, BorderLayout.EAST);
-        bottom.add(footer, BorderLayout.SOUTH);
-
-        // Сборка
-        getContentPane().setLayout(new BorderLayout(8, 8));
-        getContentPane().add(top, BorderLayout.NORTH);
-        getContentPane().add(center, BorderLayout.CENTER);
-        getContentPane().add(bottom, BorderLayout.SOUTH);
+        var content = getContentPane();
+        content.setLayout(new BorderLayout(8, 8));
+        content.add(center, BorderLayout.CENTER);
+        content.add(statusBar, BorderLayout.SOUTH);
         getRootPane().setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
-        // Начальные состояния
-        cmbDateSource.setSelectedIndex(0); // только имя файла
-        cmbIfNoDate.setSelectedIndex(0);   // пропустить
-        btnPause.setEnabled(false);
-        btnStop.setEnabled(false);
-        btnOpenDest.setEnabled(false);
-        btnOpenLog.setEnabled(false);
+        // Применяем конфиг к UI и положению окна
+        applyConfigToUi();
+        applyWindowBounds();
 
-        // Простейшие обработчики "Выбрать..."
-        btnBrowseSource.addActionListener(e -> chooseDirInto(txtSource));
-        btnBrowseDest.addActionListener(e -> chooseDirInto(txtDest));
+        // Колбэки пересканирования
+        sourcePanel.setOnSourceChanged(this::runScanUpdate);
+        sourcePanel.setOnTemplateChanged(this::runScanUpdate);
 
-// Предпросмотр — сначала валидация, потом демо-строки
-        btnPreview.addActionListener(e -> {
-            if (!validateInputs()) return;
+        // Слушатели
+        btnSortIt.addActionListener(e -> onSortItClicked());
 
-            tableModel.setRowCount(0);
-            tableModel.addRow(new Object[]{
-                    "IMG_20250131_142530.jpg", txtSource.getText().trim(),
-                    txtDest.getText().trim() + "\\2025\\01\\31\\",
-                    rbMove.isSelected() ? "move" : "copy", "planned", "—"
-            });
-            tableModel.addRow(new Object[]{
-                    "photo.png", txtSource.getText().trim(),
-                    "—", "skipped", "no-date", "дата в имени не найдена"
-            });
-            lblSummary.setText("Найдено: 2 • К обработке: 1 • Пропущено: 1");
-            progress.setValue(0);
+        // Сохранить конфиг и геометрию при закрытии
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override public void windowClosing(java.awt.event.WindowEvent e) {
+                writeUiToConfig();
+                captureWindowBounds();
+                ConfigIO.save(config);
+            }
+            @Override public void windowOpened(java.awt.event.WindowEvent e) {
+                // Автоскан при старте, если папка существует
+                runScanUpdate();
+            }
         });
+    }
 
-// Старт — валидация + блокируем/разблокируем
-        btnStart.addActionListener(e -> {
-            if (!validateInputs()) return;
-            setRunningState(true);
-            progress.setValue(0);
+    // ===== конфиг/геометрия =====
+    private void applyConfigToUi() {
+        sourcePanel.applyConfig(config);
+        destPanel.applyConfig(config);
+        chkShowResults.setSelected(config.showResult);
+        lblStatus.setText(Strings.get("status.ready"));
+    }
 
-            Timer t = new Timer(30, ev -> {
+    private void writeUiToConfig() {
+        sourcePanel.writeToConfig(config);
+        destPanel.writeToConfig(config);
+        config.showResult = chkShowResults.isSelected();
+    }
+
+    private void applyWindowBounds() {
+        if (config.windowW > 0 && config.windowH > 0) setSize(config.windowW, config.windowH);
+        if (config.windowX >= 0 && config.windowY >= 0) setLocation(config.windowX, config.windowY);
+    }
+
+    private void captureWindowBounds() {
+        Point p = getLocationOnScreen();
+        Dimension d = getSize();
+        config.windowX = p.x;
+        config.windowY = p.y;
+        config.windowW = d.width;
+        config.windowH = d.height;
+    }
+
+    // ===== сканирование без запуска обработки =====
+    private void runScanUpdate() {
+        String src = sourcePanel.getSourceDir();
+        if (src.isBlank() || !Files.exists(Path.of(src)) || !Files.isDirectory(Path.of(src))) {
+            lblStatus.setText(Strings.get("scan.source.missing"));
+            return;
+        }
+
+        var res = finder.scan(src, sourcePanel.getFilenameTemplate());
+
+        if (res.sourceMissing) {
+            lblStatus.setText(Strings.get("scan.source.missing"));
+            return;
+        }
+        if (res.emptySource) {
+            lblStatus.setText(Strings.get("scan.empty"));
+            return;
+        }
+
+        if (res.matchedFiles > 0) {
+            if (res.detectedTemplate != null) {
+                sourcePanel.setFilenameTemplate(res.detectedTemplate);
+            }
+            lblStatus.setText(MessageFormat.format(Strings.get("scan.found"), res.matchedFiles));
+        } else {
+            lblStatus.setText(MessageFormat.format(Strings.get("scan.total.zero"), res.totalFiles));
+        }
+    }
+
+    // ===== запуск обработки (пока демо) =====
+    private void onSortItClicked() {
+        // повторим мягкую валидацию перед обработкой
+        String src = sourcePanel.getSourceDir();
+        if (src.isBlank() || !Files.exists(Path.of(src)) || !Files.isDirectory(Path.of(src))) {
+            lblStatus.setText(Strings.get("scan.source.missing"));
+            return;
+        }
+
+        // Скан перед запуском — используем текущий шаблон
+        var res = finder.scan(src, sourcePanel.getFilenameTemplate());
+        if (res.matchedFiles == 0) {
+            if (res.emptySource) lblStatus.setText(Strings.get("scan.empty"));
+            else lblStatus.setText(MessageFormat.format(Strings.get("scan.total.zero"), res.totalFiles));
+            return;
+        } else {
+            lblStatus.setText(MessageFormat.format(Strings.get("scan.found"), res.matchedFiles));
+        }
+
+        String dst = destPanel.getDestDir();
+        if (dst.isBlank()) { warn(Strings.get("warn.dest.empty")); destPanel.focusDest(); return; }
+
+        // Сохраним UI → config
+        writeUiToConfig();
+        ConfigIO.save(config);
+
+        setBusy(true);
+        progress.setValue(0);
+        lblStatus.setText(Strings.get("status.running"));
+
+        SwingUtilities.invokeLater(() -> {
+            try { Thread.sleep(150); } catch (InterruptedException ignored) {}
+            int processed = res.matchedFiles;
+            int errors = 0;
+            writeDemoLog(processed, errors);
+
+            new Timer(15, ev -> {
                 int v = progress.getValue();
                 if (v >= 100) {
                     ((Timer) ev.getSource()).stop();
-                    setRunningState(false);
-                    JOptionPane.showMessageDialog(this, "Готово! 2 файла обработано.", "SortIt", JOptionPane.INFORMATION_MESSAGE);
+                    lblStatus.setText(MessageFormat.format(Strings.get("status.done"), processed, errors));
+                    setBusy(false);
+                    if (chkShowResults.isSelected()) showLatestLog();
                 } else {
-                    progress.setValue(v + 1);
+                    progress.setValue(v + 2);
                 }
-            });
-            t.start();
-
-            // Кнопка Стоп останавливает таймер
-            btnStop.addActionListener(ev -> {
-                t.stop();
-                setRunningState(false);
-            });
+            }).start();
         });
-
-// Открыть назначение/лог
-        btnOpenDest.addActionListener(e -> openFolder(txtDest.getText().trim()));
-        btnOpenLog.addActionListener(e -> openFolder(new File(".").getAbsolutePath())); // временно: открываем текущую папку
-
-// В конце конструктора, после addActionListener:
-        btnOpenDest.setEnabled(true); // теперь активна всегда (мы проверяем путь внутри)
-        btnOpenLog.setEnabled(true);  // временно — откроет текущую папку
-
     }
 
-    private JPanel makeSourceDestPanel() {
-        JPanel p = new JPanel(new GridBagLayout());
-        p.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(), "Источник и назначение", TitledBorder.LEFT, TitledBorder.TOP));
-
-        GridBagConstraints c = new GridBagConstraints();
-        c.insets = new Insets(4,4,4,4); c.fill = GridBagConstraints.HORIZONTAL;
-
-        int row = 0;
-
-        // Источник
-        c.gridx = 0; c.gridy = row; c.weightx = 0; p.add(new JLabel("Исходная папка:"), c);
-        c.gridx = 1; c.gridy = row; c.weightx = 1; p.add(txtSource, c);
-        c.gridx = 2; c.gridy = row; c.weightx = 0; p.add(btnBrowseSource, c);
-        row++;
-
-        // Назначение
-        c.gridx = 0; c.gridy = row; c.weightx = 0; p.add(new JLabel("Папка назначения:"), c);
-        c.gridx = 1; c.gridy = row; c.weightx = 1; p.add(txtDest, c);
-        c.gridx = 2; c.gridy = row; c.weightx = 0; p.add(btnBrowseDest, c);
-        row++;
-
-        // Тип файла (на сессию) + без рекурсии
-        c.gridx = 0; c.gridy = row; c.weightx = 0; p.add(new JLabel("Тип файлов (сессия):"), c);
-        c.gridx = 1; c.gridy = row; c.weightx = 1; p.add(cmbFileMask, c);
-        c.gridx = 2; c.gridy = row; c.weightx = 0; p.add(chkNoRecursion, c);
-
-        return p;
+    private void setBusy(boolean busy) {
+        btnSortIt.setEnabled(!busy);
+        sourcePanel.setEnabledAll(!busy);
+        destPanel.setEnabledAll(!busy);
     }
 
-    private JPanel makeTemplatePanel() {
-        JPanel p = new JPanel(new GridBagLayout());
-        p.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(), "Шаблон и дата", TitledBorder.LEFT, TitledBorder.TOP));
-
-        GridBagConstraints c = new GridBagConstraints();
-        c.insets = new Insets(4,4,4,4); c.fill = GridBagConstraints.HORIZONTAL;
-
-        int row = 0;
-
-        c.gridx = 0; c.gridy = row; c.weightx = 0; p.add(new JLabel("Шаблон папок:"), c);
-        c.gridx = 1; c.gridy = row; c.weightx = 1; p.add(txtTemplate, c);
-        row++;
-
-        c.gridx = 0; c.gridy = row; c.weightx = 0; p.add(new JLabel("Источник даты:"), c);
-        c.gridx = 1; c.gridy = row; c.weightx = 1; p.add(cmbDateSource, c);
-        row++;
-
-        c.gridx = 0; c.gridy = row; c.weightx = 0; p.add(new JLabel("Если дата не найдена:"), c);
-        c.gridx = 1; c.gridy = row; c.weightx = 1; p.add(cmbIfNoDate, c);
-        row++;
-
-        JLabel help = new JLabel("Доступно: {YYYY}, {MM}, {DD}, {name}, {ext}");
-        help.setForeground(new Color(90,90,90));
-        c.gridx = 0; c.gridy = row; c.gridwidth = 2; c.weightx = 1;
-        p.add(help, c);
-
-        return p;
+    private void warn(String msg) {
+        JOptionPane.showMessageDialog(this, msg, Strings.get("app.title"), JOptionPane.WARNING_MESSAGE);
     }
 
-    private JPanel makeModePanel() {
-        JPanel p = new JPanel(new GridBagLayout());
-        p.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(), "Режим и безопасность", TitledBorder.LEFT, TitledBorder.TOP));
-
-        GridBagConstraints c = new GridBagConstraints();
-        c.insets = new Insets(4,4,4,4); c.fill = GridBagConstraints.HORIZONTAL;
-
-        ButtonGroup grp = new ButtonGroup();
-        grp.add(rbMove); grp.add(rbCopy);
-
-        int row = 0;
-
-        JPanel modePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        modePanel.add(new JLabel("Режим:"));
-        modePanel.add(rbMove);
-        modePanel.add(rbCopy);
-
-        c.gridx = 0; c.gridy = row; c.weightx = 1; p.add(modePanel, c); row++;
-
-        JPanel safetyPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        safetyPanel.add(chkDryRun);
-        safetyPanel.add(chkWriteLog);
-
-        c.gridx = 0; c.gridy = row; c.weightx = 1; p.add(safetyPanel, c);
-
-        return p;
+    // ===== Временная запись лога (читабельный текст) =====
+    private File writeDemoLog(int processed, int errors) {
+        try {
+            String ts = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
+            File f = new File("sortit-" + ts + ".log");
+            try (BufferedWriter w = new BufferedWriter(new FileWriter(f, false))) {
+                w.write(Strings.get("log.header")); w.newLine();
+                w.write(MessageFormat.format(Strings.get("log.datetime"), new Date())); w.newLine();
+                w.write(MessageFormat.format(Strings.get("log.source"), sourcePanel.getSourceDir())); w.newLine();
+                w.write(MessageFormat.format(Strings.get("log.dest"), destPanel.getDestDir())); w.newLine();
+                w.write(MessageFormat.format(Strings.get("log.template"), destPanel.getTemplate())); w.newLine();
+                w.write(MessageFormat.format(Strings.get("log.mode"),
+                        sourcePanel.isCopyMode() ? Strings.get("log.mode.copy") : Strings.get("log.mode.move"))); w.newLine();
+                w.write(MessageFormat.format(Strings.get("log.exif"),
+                        sourcePanel.isExifEnabled() ? Strings.get("log.exif.on") : Strings.get("log.exif.off"))); w.newLine();
+                w.newLine();
+                w.write(Strings.get("log.total")); w.newLine();
+                w.write(MessageFormat.format(Strings.get("log.processed"), processed)); w.newLine();
+                w.write(MessageFormat.format(Strings.get("log.errors"), errors)); w.newLine();
+            }
+            return f;
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this,
+                    MessageFormat.format(Strings.get("error.log.write"), ex.getMessage()),
+                    Strings.get("app.title"), JOptionPane.ERROR_MESSAGE);
+            return null;
+        }
     }
 
-    private JPanel makeActionsPanel() {
-        JPanel p = new JPanel(new BorderLayout());
+    private void showLatestLog() {
+        File dir = new File(".");
+        File[] files = dir.listFiles((d, name) -> name.startsWith("sortit-") && name.endsWith(".log"));
+        if (files == null || files.length == 0) {
+            JOptionPane.showMessageDialog(this, Strings.get("warn.log.notfound"), Strings.get("app.title"), JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        File latest = files[0];
+        for (File f : files) if (f.lastModified() > latest.lastModified()) latest = f;
 
-        JPanel btns = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        btns.add(btnPreview);
-        btns.add(btnStart);
-        btns.add(btnPause);
-        btns.add(btnStop);
-
-        p.add(btns, BorderLayout.WEST);
-        p.add(lblSummary, BorderLayout.EAST);
-
-        return p;
-    }
-
-    private void chooseDirInto(JTextField targetField) {
-        JFileChooser ch = new JFileChooser();
-        ch.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        ch.setDialogTitle("Выбор папки");
-        if (ch.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-            File dir = ch.getSelectedFile();
-            if (dir != null) targetField.setText(dir.getAbsolutePath());
+        try {
+            LogViewerDialog.showLog(this, latest);
+        } catch (Exception ex) {
+            try { Desktop.getDesktop().edit(latest); }
+            catch (Exception ex2) {
+                JOptionPane.showMessageDialog(this,
+                        MessageFormat.format(Strings.get("error.log.open"), latest.getAbsolutePath()),
+                        Strings.get("app.title"), JOptionPane.ERROR_MESSAGE);
+            }
         }
     }
 }
