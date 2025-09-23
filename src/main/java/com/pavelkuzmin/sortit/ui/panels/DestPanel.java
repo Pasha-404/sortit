@@ -1,6 +1,7 @@
 package com.pavelkuzmin.sortit.ui.panels;
 
 import com.pavelkuzmin.sortit.config.AppConfig;
+import com.pavelkuzmin.sortit.core.FolderTemplate;
 import com.pavelkuzmin.sortit.i18n.Strings;
 
 import javax.swing.*;
@@ -41,14 +42,11 @@ public class DestPanel extends JPanel {
         c.gridx = 1; c.gridy = row; c.weightx = 1; add(txtFolderTemplate, c);
         row++;
 
-        JLabel help = new JLabel(Strings.get("dest.folderTemplate.help"));
+        JLabel help = new JLabel(Strings.get("dest.folderTemplate.help")); // короткая подсказка
         help.setForeground(new Color(90, 90, 90));
         c.gridx = 1; c.gridy = row; c.weightx = 1; add(help, c);
 
-        // Иконка на кнопку выбора
         setupFolderIcon(btnBrowseDest, Strings.get("dest.dir.choose.tooltip"));
-
-        // Обработчик
         btnBrowseDest.addActionListener(e -> chooseDirInto(txtDest));
     }
 
@@ -75,7 +73,6 @@ public class DestPanel extends JPanel {
                 }
             } catch (Exception ignored) { }
         }
-
         final JFileChooser ch = (startDir != null) ? new JFileChooser(startDir) : new JFileChooser();
         ch.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
         ch.setDialogTitle(Strings.get("dest.dir.choose.tooltip"));
@@ -85,7 +82,6 @@ public class DestPanel extends JPanel {
             if (dir != null) targetField.setText(dir.getAbsolutePath());
         }
     }
-
 
     // ===== API =====
     public String getDestDir() { return txtDest.getText().trim(); }
@@ -100,11 +96,17 @@ public class DestPanel extends JPanel {
 
     public void applyConfig(AppConfig cfg) {
         txtDest.setText(cfg.destDir == null ? "" : cfg.destDir);
-        txtFolderTemplate.setText(cfg.destTemplate == null ? "YYYYMMDD" : cfg.destTemplate);
+        String t = (cfg.destTemplate == null || cfg.destTemplate.isBlank()) ? "YYYYMMDD" : cfg.destTemplate;
+        txtFolderTemplate.setText(FolderTemplate.isValid(t) ? t : "YYYYMMDD");
     }
 
     public void writeToConfig(AppConfig cfg) {
+        String t = getTemplate().isBlank() ? "YYYYMMDD" : getTemplate();
         cfg.destDir = getDestDir();
-        cfg.destTemplate = getTemplate();
+        cfg.destTemplate = FolderTemplate.isValid(t) ? t : "YYYYMMDD";
+        // если пользователь ввёл ерунду — сразу поправим поле
+        if (!FolderTemplate.isValid(getTemplate())) {
+            txtFolderTemplate.setText(cfg.destTemplate);
+        }
     }
 }

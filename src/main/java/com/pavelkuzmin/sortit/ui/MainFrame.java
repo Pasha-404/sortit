@@ -6,6 +6,7 @@ import com.pavelkuzmin.sortit.config.DateSource;
 import com.pavelkuzmin.sortit.core.ExifDateExtractor;
 import com.pavelkuzmin.sortit.core.FileFinder;
 import com.pavelkuzmin.sortit.core.FilenameDateParser;
+import com.pavelkuzmin.sortit.core.FolderTemplate;
 import com.pavelkuzmin.sortit.i18n.Strings;
 import com.pavelkuzmin.sortit.ui.dialogs.LogViewerDialog;
 import com.pavelkuzmin.sortit.ui.panels.DestPanel;
@@ -24,7 +25,7 @@ import java.util.List;
 
 public class MainFrame extends JFrame {
 
-    private final JComboBox<String> cmbLang = new JComboBox<>(new String[]{"RU", "EN"}); // пока выключено
+    private final JComboBox<String> cmbLang = new JComboBox<>(new String[]{"RU", "EN"});
     private final SourcePanel sourcePanel = new SourcePanel();
     private final DestPanel destPanel = new DestPanel();
 
@@ -38,10 +39,15 @@ public class MainFrame extends JFrame {
     private AppConfig config = ConfigIO.loadOrDefaults();
 
     public MainFrame() {
-        super(Strings.get("app.title"));
+        super("SortIt"); // заголовок зададим позже после выбора языка
+
+        // установить язык из конфига ДО создания UI
+        if (config.lang == null || config.lang.isBlank()) config.lang = "ru";
+        Strings.setLanguageCode(config.lang);
+        setTitle(Strings.get("app.title"));
 
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-        setMinimumSize(new Dimension(720, 520)); // было 480x480
+        setMinimumSize(new Dimension(720, 520));
         setLocationByPlatform(true);
 
         try {
@@ -52,10 +58,14 @@ public class MainFrame extends JFrame {
         // ===== Верх =====
         JPanel header = new JPanel(new BorderLayout(6, 6));
         JPanel langPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 6));
-        cmbLang.setEnabled(false);
+        cmbLang.setEnabled(true);
         langPanel.add(new JLabel(Strings.get("lang.label")));
         langPanel.add(cmbLang);
         header.add(langPanel, BorderLayout.EAST);
+
+        // выставить выбранный язык в комбо
+        cmbLang.setSelectedItem("en".equalsIgnoreCase(config.lang) ? "EN" : "RU");
+        cmbLang.addActionListener(e -> onLanguageChanged());
 
         // ===== Центр =====
         JPanel center = new JPanel();
@@ -107,6 +117,27 @@ public class MainFrame extends JFrame {
         });
     }
 
+    // Переключение языка: сохраняем, меняем bundle и перезапускаем окно
+    private void onLanguageChanged() {
+        String sel = (String) cmbLang.getSelectedItem();
+        String code = "EN".equalsIgnoreCase(sel) ? "en" : "ru";
+        if (!code.equalsIgnoreCase(config.lang)) {
+            config.lang = code;
+            Strings.setLanguageCode(code);
+            ConfigIO.save(config);
+            // мягкий "перезапуск" окна, чтобы все надписи подхватили новый bundle
+            SwingUtilities.invokeLater(() -> {
+                Point loc = getLocationOnScreen();
+                Dimension size = getSize();
+                dispose();
+                MainFrame fresh = new MainFrame();
+                fresh.setSize(size);
+                fresh.setLocation(loc);
+                fresh.setVisible(true);
+            });
+        }
+    }
+
     // ===== конфиг/геометрия =====
     private void applyConfigToUi() {
         sourcePanel.applyConfig(config);
@@ -148,7 +179,6 @@ public class MainFrame extends JFrame {
         if (res.sourceMissing) { lblStatus.setText(Strings.get("scan.source.missing")); return; }
         if (res.emptySource)   { lblStatus.setText(Strings.get("scan.empty")); return; }
 
-        // Подставить шаблон в поле (по правилам)
         if (res.detectedTemplate != null) {
             sourcePanel.setFilenameTemplate(res.detectedTemplate);
         }
@@ -168,12 +198,8 @@ public class MainFrame extends JFrame {
             return;
         }
 
-        // Скан по текущему шаблону
         var res = finder.scan(src, sourcePanel.getFilenameTemplate());
-        if (res.emptySource) {
-            lblStatus.setText(Strings.get("scan.empty"));
-            return;
-        }
+        if (res.emptySource) { lblStatus.setText(Strings.get("scan.empty")); return; }
         if (res.matchedFiles == 0) {
             lblStatus.setText(MessageFormat.format(Strings.get("scan.total.zero"), res.totalFiles));
             return;
@@ -184,6 +210,12 @@ public class MainFrame extends JFrame {
         String dst = destPanel.getDestDir();
         if (dst.isBlank()) { warn(Strings.get("warn.dest.empty")); destPanel.focusDest(); return; }
 
+        String folderTpl = destPanel.getTemplate().isBlank() ? "YYYYMMDD" : destPanel.getTemplate();
+        if (!FolderTemplate.isValid(folderTpl)) {
+            warn(Strings.get("error.dest.template.invalid"));
+            return;
+        }
+
         writeUiToConfig();
         ConfigIO.save(config);
 
@@ -191,14 +223,14 @@ public class MainFrame extends JFrame {
         progress.setValue(0);
         lblStatus.setText(Strings.get("status.running"));
 
-        // Сама "обработка": проходим по файлам, согласно шаблону, валидируем дату.
         SwingUtilities.invokeLater(() -> {
             List<String> errors = new ArrayList<>();
             int processed = 0;
+            int ok = 0;
 
             try (DirectoryStream<Path> ds = Files.newDirectoryStream(Path.of(src))) {
-                // соберём regex из glob-шаблона
                 var rx = globToRegex(sourcePanel.getFilenameTemplate());
+
                 for (Path p : ds) {
                     if (!Files.isRegularFile(p)) continue;
                     String name = p.getFileName().toString();
@@ -216,7 +248,7 @@ public class MainFrame extends JFrame {
                         case CREATED -> {
                             try {
                                 var attrs = Files.readAttributes(p, java.nio.file.attribute.BasicFileAttributes.class);
-                                var ct = attrs.creationTime(); // может совпадать с lastModified на некоторых ФС
+                                var ct = attrs.creationTime();
                                 if (ct != null) {
                                     date = ct.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
                                 } else {
@@ -233,14 +265,45 @@ public class MainFrame extends JFrame {
                         }
                     }
 
-                    // здесь позже будет реальное копирование/перенос по шаблону назначения на основе date
+                    if (date == null) continue;
+
+                    String folderName = FolderTemplate.apply(folderTpl, date);
+                    Path targetDir = Path.of(dst, folderName);
+                    try {
+                        Files.createDirectories(targetDir);
+                    } catch (Exception ex) {
+                        errors.add(MessageFormat.format(Strings.get("error.dest.mkdir"), name, targetDir.toString(), ex.getMessage()));
+                        continue;
+                    }
+
+                    Path target = targetDir.resolve(name);
+                    if (Files.exists(target)) {
+                        errors.add(MessageFormat.format(Strings.get("error.dest.exists"), name, target.toString()));
+                        continue;
+                    }
+
+                    try {
+                        if (sourcePanel.isCopyMode()) {
+                            Files.copy(p, target);
+                        } else {
+                            try {
+                                Files.move(p, target);
+                            } catch (AtomicMoveNotSupportedException e) {
+                                Files.copy(p, target);
+                                Files.delete(p);
+                            }
+                        }
+                        ok++;
+                    } catch (Exception ex) {
+                        errors.add(MessageFormat.format(Strings.get("error.transfer"), name, target.toString(), ex.getMessage()));
+                    }
                 }
             } catch (Exception e) {
                 errors.add("Internal error: " + e.getMessage());
             }
 
-            final int processedCount = processed;      // <- делаем final
-            final int errorsCount = errors.size();     // <- делаем final
+            final int processedCount = processed;
+            final int errorsCount = errors.size();
             writeProcessLog(processedCount, errors);
 
             new Timer(15, ev -> {
@@ -267,7 +330,6 @@ public class MainFrame extends JFrame {
         JOptionPane.showMessageDialog(this, msg, Strings.get("app.title"), JOptionPane.WARNING_MESSAGE);
     }
 
-    // ===== Запись лога обработки (с ошибками) =====
     private File writeProcessLog(int processed, List<String> errors) {
         try {
             String ts = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
@@ -278,11 +340,18 @@ public class MainFrame extends JFrame {
                 w.write(MessageFormat.format(Strings.get("log.source"), sourcePanel.getSourceDir())); w.newLine();
                 w.write(MessageFormat.format(Strings.get("log.dest"), destPanel.getDestDir())); w.newLine();
                 w.write(MessageFormat.format(Strings.get("log.template"), destPanel.getTemplate())); w.newLine();
+
+                String dsText = switch (sourcePanel.getDateSource()) {
+                    case METADATA -> Strings.get("log.dateSource.metadata");
+                    case CREATED  -> Strings.get("log.dateSource.created");
+                    default       -> Strings.get("log.dateSource.filename");
+                };
+                w.write(MessageFormat.format(Strings.get("log.dateSource"), dsText)); w.newLine();
+
                 w.write(MessageFormat.format(Strings.get("log.mode"),
                         sourcePanel.isCopyMode() ? Strings.get("log.mode.copy") : Strings.get("log.mode.move"))); w.newLine();
-                w.write(MessageFormat.format(Strings.get("log.exif"),
-                        (sourcePanel.getDateSource() == DateSource.METADATA) ? Strings.get("log.exif.on") : Strings.get("log.exif.off"))); w.newLine();
                 w.newLine();
+
                 w.write(Strings.get("log.total")); w.newLine();
                 w.write(MessageFormat.format(Strings.get("log.processed"), processed)); w.newLine();
                 w.write(MessageFormat.format(Strings.get("log.errors"), errors.size())); w.newLine();
@@ -303,7 +372,6 @@ public class MainFrame extends JFrame {
         }
     }
 
-    // === утилита: glob -> regex (копия из FileFinder, чтобы не тянуть приватный) ===
     private static java.util.regex.Pattern globToRegex(String glob) {
         String g = (glob == null || glob.isBlank()) ? "*.*" : glob.trim();
         StringBuilder sb = new StringBuilder("^");
