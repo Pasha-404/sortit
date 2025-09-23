@@ -3,9 +3,9 @@ package com.pavelkuzmin.sortit.config;
 public class AppConfig {
     // Источник
     public String sourceDir = "";
-    public String filenameTemplate = "";
-    public boolean useExif = false;
-    public boolean copyMode = true; // true=copy, false=move
+    public String filenameTemplate = "*.*";         // настоящий шаблон (glob)
+    public DateSource dateSource = DateSource.METADATA; // по умолчанию EXIF/metadata
+    public boolean copyMode = true;                 // true = копировать, false = переносить
 
     // Назначение
     public String destDir = "";

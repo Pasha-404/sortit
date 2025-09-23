@@ -1,6 +1,7 @@
 package com.pavelkuzmin.sortit.ui.panels;
 
 import com.pavelkuzmin.sortit.config.AppConfig;
+import com.pavelkuzmin.sortit.config.DateSource;
 import com.pavelkuzmin.sortit.i18n.Strings;
 
 import javax.swing.*;
@@ -15,16 +16,27 @@ public class SourcePanel extends JPanel {
     private final JTextField txtSource = new JTextField();
     private final JButton btnBrowseSource = new JButton();
 
-    private final JTextField txtFilenameTemplate = new JTextField("");
+    private final JTextField txtFilenameTemplate = new JTextField("*.*");
 
-    private final JCheckBox chkUseExif = new JCheckBox(Strings.get("source.exif.checkbox"), false);
+    // Брать дату из:
+    private final JRadioButton rbFromName    = new JRadioButton(Strings.get("source.dateSource.filename"));
+    private final JRadioButton rbFromMeta    = new JRadioButton(Strings.get("source.dateSource.metadata"), true);
+    private final JRadioButton rbFromCreated = new JRadioButton(Strings.get("source.dateSource.created"));
 
+    // Режим копирования/переноса
     private final JRadioButton rbCopy = new JRadioButton(Strings.get("source.mode.copy"), true);
     private final JRadioButton rbMove = new JRadioButton(Strings.get("source.mode.move"));
 
-    // Колбэки для MainFrame
+    // Колбэки
     private Runnable onSourceChanged;
     private Runnable onTemplateChanged;
+
+    public static class UiState {
+        public String sourceDir;
+        public String filenameTemplate;
+        public boolean copyMode;
+        public DateSource dateSource;
+    }
 
     public SourcePanel() {
         setLayout(new GridBagLayout());
@@ -47,26 +59,43 @@ public class SourcePanel extends JPanel {
         c.gridx = 2; c.gridy = row; c.weightx = 0; add(btnBrowseSource, c);
         row++;
 
-        // Шаблон имени файла
+        // Шаблон имени файла (glob)
         c.gridx = 0; c.gridy = row; c.weightx = 0; add(new JLabel(Strings.get("source.nameTemplate.label")), c);
         c.gridx = 1; c.gridy = row; c.weightx = 1; add(txtFilenameTemplate, c);
         row++;
 
-        // EXIF
-        c.gridx = 1; c.gridy = row; c.weightx = 1; add(chkUseExif, c);
+        // ===== Блоки с выравниванием по колонкам =====
+        // Подпись слева
+        c.gridx = 0; c.gridy = row; c.weightx = 0;
+        add(new JLabel(Strings.get("source.dateSource.label")), c);
+
+        // Справа сетка 2 строки x 3 колонки:
+        // 1-я строка: [имени файла] [EXIF] [даты создания]
+        // 2-я строка: [Копировать]  [Переносить] [пусто]
+        JPanel grid = new JPanel(new GridLayout(2, 3, 12, 4));
+        grid.setPreferredSize(new Dimension(520, 48)); // даём панели желаемую ширину
+
+        ButtonGroup gDate = new ButtonGroup();
+        gDate.add(rbFromName);
+        gDate.add(rbFromMeta);
+        gDate.add(rbFromCreated);
+        rbFromMeta.setSelected(true); // по умолчанию EXIF/metadata
+
+        grid.add(rbFromName);
+        grid.add(rbFromMeta);
+        grid.add(rbFromCreated);
+
+        ButtonGroup grpMode = new ButtonGroup();
+        grpMode.add(rbCopy);
+        grpMode.add(rbMove);
+
+        grid.add(rbCopy);
+        grid.add(rbMove);
+        grid.add(new JLabel("")); // пустая ячейка для выравнивания
+
+        c.gridx = 1; c.gridy = row; c.weightx = 1;
+        add(grid, c);
         row++;
-
-        // Режим: копировать/переносить
-        ButtonGroup grp = new ButtonGroup();
-        grp.add(rbCopy);
-        grp.add(rbMove);
-
-        JPanel mode = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        mode.add(new JLabel(Strings.get("source.mode.label")));
-        mode.add(rbCopy);
-        mode.add(rbMove);
-
-        c.gridx = 1; c.gridy = row; c.weightx = 1; add(mode, c);
 
         // Иконка на кнопку выбора
         setupFolderIcon(btnBrowseSource, Strings.get("source.dir.choose.tooltip"));
@@ -77,10 +106,7 @@ public class SourcePanel extends JPanel {
             fireSourceChanged();
         });
 
-        // ENTER в шаблоне → перескан
         txtFilenameTemplate.addActionListener(e -> fireTemplateChanged());
-
-        // Потеря фокуса у шаблона → перескан
         txtFilenameTemplate.addFocusListener(new FocusAdapter() {
             @Override public void focusLost(FocusEvent e) { fireTemplateChanged(); }
         });
@@ -99,19 +125,14 @@ public class SourcePanel extends JPanel {
     }
 
     private void chooseDirInto(JTextField targetField) {
-        // берём стартовую директорию из поля
         File startDir = null;
         String current = targetField.getText().trim();
         if (!current.isEmpty()) {
             try {
                 File f = new File(current);
-                if (f.exists()) {
-                    startDir = f.isDirectory() ? f : f.getParentFile();
-                }
+                if (f.exists()) startDir = f.isDirectory() ? f : f.getParentFile();
             } catch (Exception ignored) { }
         }
-
-        // создаём JFileChooser с начальной директорией (если есть)
         final JFileChooser ch = (startDir != null) ? new JFileChooser(startDir) : new JFileChooser();
         ch.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
         ch.setDialogTitle(Strings.get("source.dir.choose.tooltip"));
@@ -122,50 +143,48 @@ public class SourcePanel extends JPanel {
         }
     }
 
-
     // ===== API =====
     public String getSourceDir() { return txtSource.getText().trim(); }
     public String getFilenameTemplate() { return txtFilenameTemplate.getText().trim(); }
     public void   setFilenameTemplate(String tpl) { txtFilenameTemplate.setText(tpl == null ? "" : tpl); }
 
-    public boolean isExifEnabled() { return chkUseExif.isSelected(); }
     public boolean isCopyMode() { return rbCopy.isSelected(); }
-
-    public void focusSource() { txtSource.requestFocus(); }
-
-    public UiState exportState() {
-        UiState s = new UiState();
-        s.sourceDir = getSourceDir();
-        s.filenameTemplate = getFilenameTemplate();
-        s.useExif = isExifEnabled();
-        s.copyMode = isCopyMode();
-        return s;
+    public DateSource getDateSource() {
+        if (rbFromMeta.isSelected())    return DateSource.METADATA;
+        if (rbFromCreated.isSelected()) return DateSource.CREATED;
+        return DateSource.FILENAME;
     }
 
     public void setEnabledAll(boolean enabled) {
         txtSource.setEnabled(enabled);
         btnBrowseSource.setEnabled(enabled);
         txtFilenameTemplate.setEnabled(enabled);
-        chkUseExif.setEnabled(enabled);
+        rbFromName.setEnabled(enabled);
+        rbFromMeta.setEnabled(enabled);
+        rbFromCreated.setEnabled(enabled);
         rbCopy.setEnabled(enabled);
         rbMove.setEnabled(enabled);
     }
 
     public void applyConfig(AppConfig cfg) {
-        setFilenameTemplate(cfg.filenameTemplate);
+        setFilenameTemplate(cfg.filenameTemplate == null ? "*.*" : cfg.filenameTemplate);
         txtSource.setText(cfg.sourceDir == null ? "" : cfg.sourceDir);
-        chkUseExif.setSelected(cfg.useExif);
+        switch (cfg.dateSource) {
+            case METADATA -> rbFromMeta.setSelected(true);
+            case CREATED  -> rbFromCreated.setSelected(true);
+            default       -> rbFromName.setSelected(true);
+        }
         if (cfg.copyMode) rbCopy.setSelected(true); else rbMove.setSelected(true);
     }
 
     public void writeToConfig(AppConfig cfg) {
         cfg.sourceDir = getSourceDir();
-        cfg.filenameTemplate = getFilenameTemplate();
-        cfg.useExif = isExifEnabled();
+        cfg.filenameTemplate = getFilenameTemplate().isBlank() ? "*.*" : getFilenameTemplate();
+        cfg.dateSource = getDateSource();
         cfg.copyMode = isCopyMode();
     }
 
-    // Регистрация колбэков
+    // Колбэки
     public void setOnSourceChanged(Runnable r)   { this.onSourceChanged = r; }
     public void setOnTemplateChanged(Runnable r) { this.onTemplateChanged = r; }
 
