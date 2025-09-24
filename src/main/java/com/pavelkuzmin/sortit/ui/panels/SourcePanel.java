@@ -5,6 +5,9 @@ import com.pavelkuzmin.sortit.config.DateSource;
 import com.pavelkuzmin.sortit.i18n.Strings;
 
 import javax.swing.*;
+import javax.swing.border.CompoundBorder;
+import javax.swing.border.EmptyBorder;
+import javax.swing.border.LineBorder;
 import javax.swing.border.TitledBorder;
 import java.awt.*;
 import java.awt.event.FocusAdapter;
@@ -17,6 +20,7 @@ public class SourcePanel extends JPanel {
     private final JButton btnBrowseSource = new JButton();
 
     private final JTextField txtFilenameTemplate = new JTextField("*.*");
+    private final JLabel infoNameTpl = makeInfoIcon(Strings.get("hint.filenameTemplate"));
 
     // Брать дату из:
     private final JRadioButton rbFromName    = new JRadioButton(Strings.get("source.dateSource.filename"));
@@ -27,7 +31,6 @@ public class SourcePanel extends JPanel {
     private final JRadioButton rbCopy = new JRadioButton(Strings.get("source.mode.copy"), true);
     private final JRadioButton rbMove = new JRadioButton(Strings.get("source.mode.move"));
 
-    // Колбэки
     private Runnable onSourceChanged;
     private Runnable onTemplateChanged;
 
@@ -39,13 +42,16 @@ public class SourcePanel extends JPanel {
     }
 
     public SourcePanel() {
-        setLayout(new GridBagLayout());
-        setBorder(BorderFactory.createTitledBorder(
-                BorderFactory.createEtchedBorder(),
-                Strings.get("source.title"),
-                TitledBorder.LEFT,
-                TitledBorder.TOP
+        // «карточка»: тонкая рамка + внутренние отступы
+        setBorder(new CompoundBorder(
+                BorderFactory.createTitledBorder(
+                        new LineBorder(new Color(0xD0D0D0)),
+                        Strings.get("source.title"),
+                        TitledBorder.LEFT, TitledBorder.TOP
+                ),
+                new EmptyBorder(6, 8, 8, 8)
         ));
+        setLayout(new GridBagLayout());
 
         GridBagConstraints c = new GridBagConstraints();
         c.insets = new Insets(4, 4, 4, 4);
@@ -59,42 +65,55 @@ public class SourcePanel extends JPanel {
         c.gridx = 2; c.gridy = row; c.weightx = 0; add(btnBrowseSource, c);
         row++;
 
-        // Шаблон имени файла (glob)
-        c.gridx = 0; c.gridy = row; c.weightx = 0; add(new JLabel(Strings.get("source.nameTemplate.label")), c);
+        // Шаблон имени файла + ℹ
+        c.gridx = 0; c.gridy = row; c.weightx = 0;
+        JPanel nameLabel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        nameLabel.setOpaque(false);
+        nameLabel.add(new JLabel(Strings.get("source.nameTemplate.label")));
+        nameLabel.add(infoNameTpl);
+        add(nameLabel, c);
+
         c.gridx = 1; c.gridy = row; c.weightx = 1; add(txtFilenameTemplate, c);
         row++;
 
-        // ===== Блоки с выравниванием по колонкам =====
-        // Подпись слева
+        // ===== Ряд 1: Брать дату из =====
         c.gridx = 0; c.gridy = row; c.weightx = 0;
         add(new JLabel(Strings.get("source.dateSource.label")), c);
 
-        // Справа сетка 2 строки x 3 колонки:
-        // 1-я строка: [имени файла] [EXIF] [даты создания]
-        // 2-я строка: [Копировать]  [Переносить] [пусто]
-        JPanel grid = new JPanel(new GridLayout(2, 3, 12, 4));
-        grid.setPreferredSize(new Dimension(520, 48)); // даём панели желаемую ширину
-
+        JPanel dateRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
+        dateRow.setOpaque(false);
         ButtonGroup gDate = new ButtonGroup();
         gDate.add(rbFromName);
         gDate.add(rbFromMeta);
         gDate.add(rbFromCreated);
-        rbFromMeta.setSelected(true); // по умолчанию EXIF/metadata
+        rbFromMeta.setSelected(true);
 
-        grid.add(rbFromName);
-        grid.add(rbFromMeta);
-        grid.add(rbFromCreated);
+        // лёгкие пояснения в тултипах
+        rbFromMeta.setToolTipText(Strings.get("source.dateSource.metadata"));
+        rbFromName.setToolTipText(Strings.get("source.dateSource.filename"));
+        rbFromCreated.setToolTipText(Strings.get("source.dateSource.created"));
 
+        dateRow.add(rbFromName);
+        dateRow.add(rbFromMeta);
+        dateRow.add(rbFromCreated);
+
+        c.gridx = 1; c.gridy = row; c.weightx = 1; add(dateRow, c);
+        row++;
+
+        // ===== Ряд 2: Режим =====
+        c.gridx = 0; c.gridy = row; c.weightx = 0;
+        add(new JLabel(Strings.get("source.mode.label")), c);
+
+        JPanel modeRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
+        modeRow.setOpaque(false);
         ButtonGroup grpMode = new ButtonGroup();
         grpMode.add(rbCopy);
         grpMode.add(rbMove);
 
-        grid.add(rbCopy);
-        grid.add(rbMove);
-        grid.add(new JLabel("")); // пустая ячейка для выравнивания
+        modeRow.add(rbCopy);
+        modeRow.add(rbMove);
 
-        c.gridx = 1; c.gridy = row; c.weightx = 1;
-        add(grid, c);
+        c.gridx = 1; c.gridy = row; c.weightx = 1; add(modeRow, c);
         row++;
 
         // Иконка на кнопку выбора
@@ -112,16 +131,19 @@ public class SourcePanel extends JPanel {
         });
     }
 
+    private JLabel makeInfoIcon(String tooltip) {
+        JLabel lbl = new JLabel(UIManager.getIcon("OptionPane.informationIcon"));
+        lbl.setToolTipText(tooltip);
+        return lbl;
+    }
+
     private void setupFolderIcon(AbstractButton btn, String tooltip) {
         btn.setText("");
         btn.setToolTipText(tooltip);
         try {
             var url = getClass().getResource("/icons/folder-open.png");
-            if (url != null) btn.setIcon(new ImageIcon(url));
-            else btn.setText("...");
-        } catch (Exception ex) {
-            btn.setText("...");
-        }
+            if (url != null) btn.setIcon(new ImageIcon(url)); else btn.setText("...");
+        } catch (Exception ex) { btn.setText("..."); }
     }
 
     private void chooseDirInto(JTextField targetField) {
@@ -131,12 +153,11 @@ public class SourcePanel extends JPanel {
             try {
                 File f = new File(current);
                 if (f.exists()) startDir = f.isDirectory() ? f : f.getParentFile();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) {}
         }
         final JFileChooser ch = (startDir != null) ? new JFileChooser(startDir) : new JFileChooser();
         ch.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
         ch.setDialogTitle(Strings.get("source.dir.choose.tooltip"));
-
         if (ch.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             File dir = ch.getSelectedFile();
             if (dir != null) targetField.setText(dir.getAbsolutePath());
@@ -184,10 +205,8 @@ public class SourcePanel extends JPanel {
         cfg.copyMode = isCopyMode();
     }
 
-    // Колбэки
     public void setOnSourceChanged(Runnable r)   { this.onSourceChanged = r; }
     public void setOnTemplateChanged(Runnable r) { this.onTemplateChanged = r; }
-
     private void fireSourceChanged()   { if (onSourceChanged != null) onSourceChanged.run(); }
     private void fireTemplateChanged() { if (onTemplateChanged != null) onTemplateChanged.run(); }
 }

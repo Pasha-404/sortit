@@ -13,6 +13,7 @@ import com.pavelkuzmin.sortit.ui.panels.DestPanel;
 import com.pavelkuzmin.sortit.ui.panels.SourcePanel;
 
 import javax.swing.*;
+import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.io.*;
 import java.nio.file.*;
@@ -77,9 +78,17 @@ public class MainFrame extends JFrame {
         center.add(destPanel);
         center.add(Box.createVerticalStrut(8));
 
-        JPanel actionRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 4));
+        JPanel actionRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 6));
+        btnSortIt.setText("▶ " + Strings.get("run.button"));
         btnSortIt.setFont(btnSortIt.getFont().deriveFont(Font.BOLD, 16f));
-        btnSortIt.setPreferredSize(new Dimension(180, 40));
+        btnSortIt.setPreferredSize(new Dimension(200, 42));
+// простая «синяя» кнопка (в системной теме может слегка отличаться)
+        btnSortIt.setBackground(new Color(0x0078D7));
+        btnSortIt.setForeground(Color.WHITE);
+        btnSortIt.setFocusPainted(false);
+        btnSortIt.setOpaque(true);
+        btnSortIt.setBorder(new LineBorder(new Color(0x0064B4), 1, true));
+
         actionRow.add(btnSortIt);
         actionRow.add(chkShowResults);
         center.add(actionRow);
@@ -241,7 +250,7 @@ public class MainFrame extends JFrame {
                     LocalDate date = null;
                     switch (sourcePanel.getDateSource()) {
                         case METADATA -> {
-                            var d = ExifDateExtractor.readDate(p.toFile());
+                            var d = com.pavelkuzmin.sortit.core.MediaDateExtractor.readDate(p.toFile());
                             if (d.isPresent()) date = d.get();
                             else errors.add(MessageFormat.format(Strings.get("error.no.metadata"), name));
                         }
