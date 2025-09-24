@@ -43,3 +43,38 @@ This file is created next to `SortIt.exe` on first run. Example:
   "windowX": 120,
   "windowY": 120
 }
+
+Known limitations
+
+AVCHD/M2TS: creation date is usually not embedded in the file itself → use “file name” or “creation time”.
+
+Windows SmartScreen may warn about unknown publisher (open-source unsigned build). Click More info → Run anyway.
+
+Roadmap
+
+Optional AVCHD (.CPI) date reading
+
+More languages (built-in)
+
+Conflict handling options (rename/skip)
+
+Installer build (EXE/MSI) as an alternative download
+
+Troubleshooting
+
+Nothing found: check the file pattern (try *.*) and verify files are directly in the source folder (no recursion).
+
+No metadata found: switch date source to file name or creation time.
+
+Log: enable “Show results” to see errors summary.
+
+Feedback
+
+Use Issues for bugs and feature requests
+
+Use Discussions for Q&A / ideas
+Screenshots and sample files welcome!
+
+License
+
+MIT
