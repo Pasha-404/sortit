@@ -79,15 +79,11 @@ public class MainFrame extends JFrame {
         center.add(Box.createVerticalStrut(8));
 
         JPanel actionRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 6));
-        btnSortIt.setText("▶ " + Strings.get("run.button"));
+        btnSortIt.setText(Strings.get("run.button"));
         btnSortIt.setFont(btnSortIt.getFont().deriveFont(Font.BOLD, 16f));
-        btnSortIt.setPreferredSize(new Dimension(200, 42));
-// простая «синяя» кнопка (в системной теме может слегка отличаться)
-        btnSortIt.setBackground(new Color(0x0078D7));
-        btnSortIt.setForeground(Color.WHITE);
+        btnSortIt.setPreferredSize(new Dimension(200, 40));
+// оставляем системный стиль — без ручной заливки/бордеров
         btnSortIt.setFocusPainted(false);
-        btnSortIt.setOpaque(true);
-        btnSortIt.setBorder(new LineBorder(new Color(0x0064B4), 1, true));
 
         actionRow.add(btnSortIt);
         actionRow.add(chkShowResults);

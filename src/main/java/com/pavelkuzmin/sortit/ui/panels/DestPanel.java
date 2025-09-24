@@ -37,29 +37,32 @@ public class DestPanel extends JPanel {
 
         int row = 0;
 
-        // Папка-назначение
+        // Папка-назначение: [label][text][folder]
         c.gridx = 0; c.gridy = row; c.weightx = 0; add(new JLabel(Strings.get("dest.dir.label")), c);
         c.gridx = 1; c.gridy = row; c.weightx = 1; add(txtDest, c);
         c.gridx = 2; c.gridy = row; c.weightx = 0; add(btnBrowseDest, c);
         row++;
 
-        // Шаблон папок + ℹ
-        c.gridx = 0; c.gridy = row; c.weightx = 0;
-        JPanel tplLabel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        tplLabel.setOpaque(false);
-        tplLabel.add(new JLabel(Strings.get("dest.folderTemplate.label")));
-        tplLabel.add(infoFolderTpl);
-        add(tplLabel, c);
-
+        // Шаблон папок: [label][text][info]
+        c.gridx = 0; c.gridy = row; c.weightx = 0; add(new JLabel(Strings.get("dest.folderTemplate.label")), c);
         c.gridx = 1; c.gridy = row; c.weightx = 1; add(txtFolderTemplate, c);
-        row++;
+        c.gridx = 2; c.gridy = row; c.weightx = 0; add(infoFolderTpl, c);
 
+        // 🔧 ВОТ ЭТИ ДВА ВЫЗОВА Я И УПУСТИЛ РАНЬШЕ:
         setupFolderIcon(btnBrowseDest, Strings.get("dest.dir.choose.tooltip"));
         btnBrowseDest.addActionListener(e -> chooseDirInto(txtDest));
     }
 
     private JLabel makeInfoIcon(String tooltip) {
-        JLabel lbl = new JLabel(UIManager.getIcon("OptionPane.informationIcon"));
+        Icon sys = UIManager.getIcon("OptionPane.informationIcon");
+        Icon small = sys;
+        try {
+            if (sys instanceof ImageIcon ii) {
+                Image scaled = ii.getImage().getScaledInstance(16, 16, Image.SCALE_SMOOTH);
+                small = new ImageIcon(scaled);
+            }
+        } catch (Exception ignored) {}
+        JLabel lbl = new JLabel(small);
         lbl.setToolTipText(tooltip);
         return lbl;
     }
@@ -69,7 +72,9 @@ public class DestPanel extends JPanel {
         btn.setToolTipText(tooltip);
         try {
             var url = getClass().getResource("/icons/folder-open.png");
-            if (url != null) btn.setIcon(new ImageIcon(url));
+            if (url != null) btn.setIcon(new ImageIcon(
+                    new ImageIcon(url).getImage().getScaledInstance(16,16, Image.SCALE_SMOOTH)
+            ));
             else btn.setText("...");
         } catch (Exception ex) { btn.setText("..."); }
     }
@@ -101,6 +106,7 @@ public class DestPanel extends JPanel {
         txtDest.setEnabled(enabled);
         btnBrowseDest.setEnabled(enabled);
         txtFolderTemplate.setEnabled(enabled);
+        infoFolderTpl.setEnabled(enabled);
     }
 
     public void applyConfig(AppConfig cfg) {
