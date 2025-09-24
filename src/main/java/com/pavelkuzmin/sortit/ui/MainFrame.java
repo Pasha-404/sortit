@@ -43,7 +43,7 @@ public class MainFrame extends JFrame {
         super("SortIt"); // заголовок зададим позже после выбора языка
 
         // установить язык из конфига ДО создания UI
-        if (config.lang == null || config.lang.isBlank()) config.lang = "ru";
+        if (config.lang == null || config.lang.isBlank()) config.lang = "en";
         Strings.setLanguageCode(config.lang);
         setTitle(Strings.get("app.title"));
 

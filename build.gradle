@@ -5,15 +5,12 @@ plugins {
 }
 
 group = 'com.pavelkuzmin'
-version = '0.1.0'
+version = '1.0.0'
 
 java {
-    toolchain { languageVersion = JavaLanguageVersion.of(23) }
-}
-
-application {
-    // Точка входа
-    mainClass = 'com.pavelkuzmin.sortit.Main'
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(23) // твой JDK 23
+    }
 }
 
 repositories {
@@ -21,58 +18,131 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.1'
-    implementation 'com.fasterxml.jackson.core:jackson-annotations:2.17.1'
-    implementation 'com.fasterxml.jackson.core:jackson-core:2.17.1'
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     implementation 'com.drewnoakes:metadata-extractor:2.18.0'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.2'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
-test {
+application {
+    // Главный класс приложения
+    mainClass = 'com.pavelkuzmin.sortit.Main'
+}
+
+tasks.withType(Test).configureEach {
     useJUnitPlatform()
 }
-
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
-// --- Сборка "толстого" JAR для запуска и упаковки ---
-tasks.shadowJar {
-    archiveClassifier.set('all')
+shadowJar {
+    archiveBaseName.set('sortit')
+    archiveClassifier.set('')      // без "-all"
+    archiveVersion.set('')         // без версии в имени файла
+    mergeServiceFiles()
 }
 
-// --- Упаковка в Windows-папку приложения с .exe (без установки) ---
-tasks.register('makeAppImage', Exec) {
+/**
+ * Создаёт portable app-image (папка с SortIt.exe и ВСТРОЕННЫМ runtime).
+ * Никаких module-info.java не нужно.
+ *
+ * Требования: JDK 23 (или 17+) с утилитой jpackage.
+ */
+tasks.register('packAppImage', Exec) {
     dependsOn tasks.shadowJar
+
     doFirst {
-        file("${buildDir}/jpackage").mkdirs()
+        // где лежит jpackage
+        def javaHome = System.getenv('JAVA_HOME')
+        if (!javaHome) javaHome = System.getProperty('java.home')
+        def jpackageExe = file("${javaHome}/bin/jpackage.exe")
+        if (!jpackageExe.exists()) jpackageExe = file("${javaHome}/bin/jpackage")
+        if (!jpackageExe.exists()) {
+            throw new GradleException("jpackage not found in ${javaHome}/bin")
+        }
+
+        def inputDir = "${buildDir}/libs"
+        def destDir  = "${buildDir}/jpackage"
+
+        // jlink-опции одной СТРОКОЙ:
+        def jlinkOpts = "--strip-debug --no-header-files --no-man-pages"
+
+        def cmd = [
+                jpackageExe.absolutePath,
+                '--type', 'app-image',
+                '--name', 'SortIt',
+                '--vendor', 'Pavel Kuzmin',
+                '--app-version', project.version,
+                '--input', inputDir,
+                '--dest', destDir,
+                '--main-jar', 'sortit.jar',
+                '--main-class', application.mainClass.get(),
+                '--add-modules', 'java.base,java.desktop',
+                '--jlink-options', jlinkOpts
+        ]
+
+        def ico = file('src/main/resources/icons/app.ico')
+        if (ico.exists()) {
+            cmd += ['--icon', ico.absolutePath]
+        }
+
+        commandLine cmd
     }
-    commandLine = [
-            "${System.properties['java.home']}/bin/jpackage",
-            '--type', 'app-image',
-            '--name', 'SortIt',
-            '--app-version', "${project.version}",
-            '--input', "${buildDir}/libs",
-            '--main-jar', "${project.name}-${project.version}-all.jar",
-            '--dest', "${buildDir}/jpackage",
-            '--vendor', 'SortIt',
-            '--icon', "${project.projectDir}/src/main/resources/app-icon.ico"
-    ]
 }
 
-// --- Упаковка в обычный установщик .exe (если захочешь инсталлятор) ---
-tasks.register('makeExe', Exec) {
-    dependsOn tasks.shadowJar
-    commandLine = [
-            "${System.properties['java.home']}/bin/jpackage",
-            '--type', 'exe',
-            '--name', 'SortIt',
-            '--app-version', "${project.version}",
-            '--input', "${buildDir}/libs",
-            '--main-jar', "${project.name}-${project.version}-all.jar",
-            '--dest', "${buildDir}/jpackage",
-            '--vendor', 'SortIt',
-            '--win-dir-chooser',
-            '--icon', "${project.projectDir}/src/main/resources/app-icon.ico"
-    ]
+// 1-файловый SFX через WinRAR: извлекает во временную папку и запускает SortIt.exe
+tasks.register('sfxExe', Exec) {
+    dependsOn tasks.packAppImage
+
+    doFirst {
+        // где WinRAR
+        def wrDirs = [
+                'C:/Program Files/WinRAR',
+                'C:/Program Files (x86)/WinRAR'
+        ].collect { new File(it) }
+        File wrDir = wrDirs.find { it.exists() }
+        if (wrDir == null) throw new GradleException("WinRAR не найден. Установи WinRAR или поправь путь в build.gradle")
+
+        File winrarExe = new File(wrDir, 'WinRAR.exe')
+        if (!winrarExe.exists()) throw new GradleException("WinRAR.exe не найден в ${wrDir}")
+
+        // папка app-image от jpackage
+        File appImageDir = file("$buildDir/jpackage/SortIt")
+        if (!appImageDir.exists()) throw new GradleException("Нет app-image: ${appImageDir}. Сначала запусти packAppImage")
+
+        // рабочие файлы
+        File outDir = file("$buildDir/sfx")
+        outDir.mkdirs()
+        File comment = new File(outDir, "winrar_sfx_comment.txt")
+        File outExe  = new File(outDir, "SortIt_portable.exe")
+
+        // WinRAR SFX-скрипт
+        def sfxScript = """;The comment below contains SFX script commands
+TempMode
+Setup=SortIt.exe
+Title=SortIt
+Silent=0
+Overwrite=1
+"""
+        // пишем с указанием кодировки строкой
+        comment.setText(sfxScript, "UTF-8")
+
+        // Запаковываем ВСЁ содержимое app-image в один SFX-exe
+        // a = создать архив; -sfx = самораспак.; -ep1 = без ведущих путей; -r = рекурсивно; -inul = тихо; -z = скрипт
+        workingDir appImageDir
+        commandLine(
+                winrarExe.absolutePath,
+                'a', '-sfx', '-ep1', '-r', '-inul',
+                "-z${comment.absolutePath}",
+                outExe.absolutePath,
+                '.' // все файлы из appImageDir
+        )
+    }
+}
+
+// чтобы обычный Build сразу делал exe-образ
+tasks.named('build') {
+    dependsOn tasks.packAppImage
 }

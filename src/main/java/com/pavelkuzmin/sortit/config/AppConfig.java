@@ -2,7 +2,7 @@ package com.pavelkuzmin.sortit.config;
 
 public class AppConfig {
     // Источник
-    public String lang = "ru";
+    public String lang = "en";
     public String sourceDir = "";
     public String filenameTemplate = "*.*";         // настоящий шаблон (glob)
     public DateSource dateSource = DateSource.METADATA; // по умолчанию EXIF/metadata
