@@ -12,8 +12,8 @@ Settings in `sortit.json`. Works on Windows (embedded runtime included).
 - Language switcher (RU/EN)
 
 ## ⬇ Download
-• Portable ZIP — unzip and run SortIt/SortIt.exe
-• MSI Installer — standard Windows installer (Start Menu shortcut, optional desktop shortcut)
+- Portable ZIP — unzip and run SortIt/SortIt.exe
+- MSI Installer — standard Windows installer (Start Menu shortcut, optional desktop shortcut)
 Java is **not** required (runtime included).
 
 ## How to use
