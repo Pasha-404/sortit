@@ -12,8 +12,8 @@ No install. Settings in `sortit.json`. Works on Windows (embedded runtime includ
 - Language switcher (RU/EN)
 
 ## ⬇ Download
-1. Go to **Releases** and download `SortIt-1.0.0.zip`.  
-2. Unzip → run `SortIt/SortIt.exe`.  
+• Portable ZIP — unzip and run SortIt/SortIt.exe
+• MSI Installer — standard Windows installer (Start Menu shortcut, optional desktop shortcut)
 Java is **not** required (runtime included).
 
 ## How to use
@@ -48,10 +48,19 @@ Created on first run next to `SortIt.exe`. Example:
 - **Conflicting names** → if the target already contains a file with the same name, the operation may fail; check the log.
 
 ## Roadmap
-- Optional AVCHD (.CPI) date reading
-- More built-in languages
-- Conflict handling options (rename/skip)
-- Installer build (EXE/MSI) as an alternative download
+
+- **UI improvements**  
+  Cleaner visual hierarchy, compact layout, clearer tooltips/helps, better accessibility (contrast, focus states).
+
+- **Log housekeeping**  
+  Automatic pruning of old logs (by age and/or size), optional rotation, quick “Open latest log” action.
+
+- **New copy mode: Copy & Archive**  
+  After a successful copy to the destination, move the original file into a user-defined **backup** folder.
+  Includes conflict handling and safe fallback (skip on failure).
+
+- **More built-in languages**  
+  Expand beyond RU/EN (e.g., DE, ES, FR, IT, UK, PL) with a simple contribution guide for translations.
 
 ## Feedback
 Open an **Issue** for bugs/ideas.  
