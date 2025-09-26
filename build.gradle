@@ -142,6 +142,85 @@ Overwrite=1
     }
 }
 
+// MSI-инсталлятор с UI: выбор папки, ярлыки, меню. Требуется WiX 3.x.
+tasks.register('packMsi', Exec) {
+    dependsOn tasks.shadowJar
+
+    doFirst {
+        // 1) Проверка WiX
+        def wixDirs = [
+                'C:/Program Files (x86)/WiX Toolset v3.11/bin',
+                'C:/Program Files (x86)/WiX Toolset v3.14/bin',
+                'C:/Program Files/WiX Toolset v3.11/bin',
+                'C:/Program Files/WiX Toolset v3.14/bin'
+        ].collect { new File(it) }
+        File wixBin = wixDirs.find { new File(it, 'candle.exe').exists() && new File(it, 'light.exe').exists() }
+        if (!wixBin) throw new GradleException("WiX Toolset не найден. Установи WiX 3.x и перезапусти.")
+
+        // 2) jpackage
+        def javaHome = System.getenv('JAVA_HOME') ?: System.getProperty('java.home')
+        File jpackageExe = new File("${javaHome}/bin/jpackage.exe")
+        if (!jpackageExe.exists()) jpackageExe = new File("${javaHome}/bin/jpackage")
+        if (!jpackageExe.exists()) throw new GradleException("jpackage не найден в ${javaHome}/bin")
+
+        // 3) Пути
+        def inputDir = "${buildDir}/libs"
+        def destDir  = "${buildDir}/jpackage"
+
+        // 4) Иконка (опционально)
+        def iconArg = []
+        def ico = file('src/main/resources/icons/app.ico')
+        if (ico.exists()) iconArg = ['--icon', ico.absolutePath]
+
+        // 5) Ресурсы установщика (опционально: лицензия)
+        // Если положишь файл installer/windows/license.rtf — появится экран лицензии.
+        def resArgs = []
+        def resDir = file('installer/windows')
+        if (resDir.exists()) resArgs = ['--resource-dir', resDir.absolutePath]
+        // Папка должна содержать файл license.rtf (RTF-формат)
+
+        // 6) jlink-опции (можно убрать compress, чтобы не было предупреждения)
+        def jlinkOpts = "--strip-debug --no-header-files --no-man-pages"
+
+        // 7) Главный класс
+        def mainCls = project.extensions.getByType(org.gradle.api.plugins.JavaApplication).mainClass.get()
+
+        // 8) Команда
+        def cmd = [
+                jpackageExe.absolutePath,
+                '--type', 'msi',
+                '--name', 'SortIt',
+                '--app-version', project.version,
+                '--vendor', 'Pavel Kuzmin',
+                '--input', inputDir,
+                '--dest', destDir,
+                '--main-jar', 'sortit.jar',
+                '--main-class', mainCls,
+                '--add-modules', 'java.base,java.desktop',
+                '--jlink-options', jlinkOpts,
+
+                // 👉 Видимый UI:
+                '--win-dir-chooser',       // диалог выбора папки установки
+                '--win-menu',              // пункт в меню Пуск
+                '--win-menu-group', 'SortIt',
+                '--win-shortcut',          // ярлык на рабочем столе
+                // Убери строку выше, если ярлык на рабочем столе не нужен
+
+                // Установка "на пользователя" (без UAC-админа). Убери, чтобы попросило админ-права и ставило в Program Files.
+                '--win-per-user-install',
+
+                // Имя папки по умолчанию (в Program Files или в %LOCALAPPDATA%\Programs)
+                '--install-dir', 'SortIt'
+        ] + iconArg + resArgs
+
+        // WiX в PATH на время задачи
+        environment 'PATH', wixBin.absolutePath + File.pathSeparator + System.getenv('PATH')
+
+        commandLine cmd
+    }
+}
+
+
 // чтобы обычный Build сразу делал exe-образ
 tasks.named('build') {
     dependsOn tasks.packAppImage
