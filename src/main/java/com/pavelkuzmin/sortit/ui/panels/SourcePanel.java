@@ -1,194 +1,133 @@
 package com.pavelkuzmin.sortit.ui.panels;
 
 import com.pavelkuzmin.sortit.config.AppConfig;
-import com.pavelkuzmin.sortit.config.DateSource;
 import com.pavelkuzmin.sortit.i18n.Strings;
 
 import javax.swing.*;
-import javax.swing.border.CompoundBorder;
-import javax.swing.border.EmptyBorder;
-import javax.swing.border.LineBorder;
-import javax.swing.border.TitledBorder;
 import java.awt.*;
-import java.awt.event.FocusAdapter;
-import java.awt.event.FocusEvent;
 import java.io.File;
 
 public class SourcePanel extends JPanel {
+    public final JTextField txtSourceDir  = new JTextField();
+    public final JButton    btnBrowseSource = new JButton("…");
 
-    private final JTextField txtSource = new JTextField();
-    private final JButton btnBrowseSource = new JButton();
+    public final JTextField txtPattern = new JTextField();
 
-    private final JTextField txtFilenameTemplate = new JTextField("*.*");
-    private final JLabel infoNameTpl = makeInfoIcon(Strings.get("hint.filenameTemplate"));
+    public final JRadioButton rbDateMetadata = new JRadioButton(Strings.get("src.date.metadata"));
+    public final JRadioButton rbDateFilename = new JRadioButton(Strings.get("src.date.filename"));
+    public final JRadioButton rbDateCreated  = new JRadioButton(Strings.get("src.date.created"));
 
-    private final JRadioButton rbFromName    = new JRadioButton(Strings.get("source.dateSource.filename"));
-    private final JRadioButton rbFromMeta    = new JRadioButton(Strings.get("source.dateSource.metadata"), true);
-    private final JRadioButton rbFromCreated = new JRadioButton(Strings.get("source.dateSource.created"));
-
-    private final JRadioButton rbCopy = new JRadioButton(Strings.get("source.mode.copy"), true);
-    private final JRadioButton rbMove = new JRadioButton(Strings.get("source.mode.move"));
-
-    private Runnable onSourceChanged;
-    private Runnable onTemplateChanged;
-
-    public static class UiState {
-        public String sourceDir;
-        public String filenameTemplate;
-        public boolean copyMode;
-        public DateSource dateSource;
-    }
+    public final JRadioButton rbCopy         = new JRadioButton(Strings.get("src.mode.copy"));
+    public final JRadioButton rbMove         = new JRadioButton(Strings.get("src.mode.move"));
+    public final JRadioButton rbCopyArchive  = new JRadioButton(Strings.get("src.mode.copyArchive"));
 
     public SourcePanel() {
-        setBorder(new CompoundBorder(
-                BorderFactory.createTitledBorder(
-                        new LineBorder(new Color(0xD0D0D0)),
-                        Strings.get("source.title"),
-                        TitledBorder.LEFT, TitledBorder.TOP
-                ),
-                new EmptyBorder(6, 8, 8, 8)
-        ));
+        setBorder(BorderFactory.createTitledBorder(Strings.get("src.title")));
         setLayout(new GridBagLayout());
         GridBagConstraints c = new GridBagConstraints();
-        c.insets = new Insets(4, 4, 4, 4);
+        c.insets = new Insets(6, 6, 6, 6);
         c.fill = GridBagConstraints.HORIZONTAL;
 
-        int row = 0;
+        // Row 1: source dir
+        c.gridx = 0; c.gridy = 0; c.weightx = 0;
+        add(new JLabel(Strings.get("src.folder")), c);
 
-        // Папка-источник: [label][text][folder]
-        c.gridx = 0; c.gridy = row; c.weightx = 0; add(new JLabel(Strings.get("source.dir.label")), c);
-        c.gridx = 1; c.gridy = row; c.weightx = 1; add(txtSource, c);
-        c.gridx = 2; c.gridy = row; c.weightx = 0; add(btnBrowseSource, c);
-        row++;
+        c.gridx = 1; c.gridy = 0; c.weightx = 1.0;
+        add(txtSourceDir, c);
 
-        // Шаблон имени файла: [label][text][info]
-        c.gridx = 0; c.gridy = row; c.weightx = 0; add(new JLabel(Strings.get("source.nameTemplate.label")), c);
-        c.gridx = 1; c.gridy = row; c.weightx = 1; add(txtFilenameTemplate, c);
-        c.gridx = 2; c.gridy = row; c.weightx = 0; add(infoNameTpl, c);
-        row++;
+        c.gridx = 2; c.gridy = 0; c.weightx = 0;
+        btnBrowseSource.setFocusPainted(false);
+        add(btnBrowseSource, c);
 
-        // Брать дату из:
-        c.gridx = 0; c.gridy = row; c.weightx = 0; add(new JLabel(Strings.get("source.dateSource.label")), c);
-        JPanel dateRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
-        dateRow.setOpaque(false);
+        // Row 2: pattern
+        c.gridx = 0; c.gridy = 1; c.weightx = 0;
+        add(new JLabel(Strings.get("src.pattern")), c);
+
+        c.gridx = 1; c.gridy = 1; c.gridwidth = 2; c.weightx = 1.0;
+        txtPattern.setToolTipText(Strings.get("hint.pattern"));
+        add(txtPattern, c);
+        c.gridwidth = 1;
+
+        // Row 3: date source + mode in two columns
+        JPanel row3 = new JPanel(new GridLayout(1,2,12,0));
+
+        // left (date source)
+        JPanel left = new JPanel(new GridBagLayout());
+        GridBagConstraints l = new GridBagConstraints();
+        l.insets = new Insets(4,4,4,4);
+        l.anchor = GridBagConstraints.WEST;
+        l.gridx = 0; l.gridy = 0;
+        left.add(new JLabel(Strings.get("src.date.title")), l);
         ButtonGroup gDate = new ButtonGroup();
-        gDate.add(rbFromName); gDate.add(rbFromMeta); gDate.add(rbFromCreated);
-        dateRow.add(rbFromName); dateRow.add(rbFromMeta); dateRow.add(rbFromCreated);
-        c.gridx = 1; c.gridy = row; c.weightx = 1; c.gridwidth = 2; add(dateRow, c);
+        l.gridy = 1; left.add(rbDateMetadata, l);
+        l.gridy = 2; left.add(rbDateFilename, l);
+        l.gridy = 3; left.add(rbDateCreated,  l);
+        gDate.add(rbDateMetadata); gDate.add(rbDateFilename); gDate.add(rbDateCreated);
+
+        // right (mode)
+        JPanel right = new JPanel(new GridBagLayout());
+        GridBagConstraints r = new GridBagConstraints();
+        r.insets = new Insets(4,4,4,4);
+        r.anchor = GridBagConstraints.WEST;
+        r.gridx = 0; r.gridy = 0;
+        right.add(new JLabel(Strings.get("src.mode.title")), r);
+        ButtonGroup gMode = new ButtonGroup();
+        r.gridy = 1; right.add(rbCopy, r);
+        r.gridy = 2; right.add(rbMove, r);
+        r.gridy = 3; right.add(rbCopyArchive, r);
+        gMode.add(rbCopy); gMode.add(rbMove); gMode.add(rbCopyArchive);
+
+        row3.add(left);
+        row3.add(right);
+
+        c.gridx = 0; c.gridy = 2; c.gridwidth = 3; c.weightx = 1.0;
+        add(row3, c);
         c.gridwidth = 1;
-        row++;
 
-        // Режим:
-        c.gridx = 0; c.gridy = row; c.weightx = 0; add(new JLabel(Strings.get("source.mode.label")), c);
-        JPanel modeRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
-        modeRow.setOpaque(false);
-        ButtonGroup grpMode = new ButtonGroup();
-        grpMode.add(rbCopy); grpMode.add(rbMove);
-        modeRow.add(rbCopy); modeRow.add(rbMove);
-        c.gridx = 1; c.gridy = row; c.weightx = 1; c.gridwidth = 2; add(modeRow, c);
-        c.gridwidth = 1;
-        row++;
-
-        setupFolderIcon(btnBrowseSource, Strings.get("source.dir.choose.tooltip"));
-        btnBrowseSource.addActionListener(e -> {
-            chooseDirInto(txtSource);
-            fireSourceChanged();
-        });
-
-        txtFilenameTemplate.addActionListener(e -> fireTemplateChanged());
-        txtFilenameTemplate.addFocusListener(new FocusAdapter() {
-            @Override public void focusLost(FocusEvent e) { fireTemplateChanged(); }
-        });
+        btnBrowseSource.addActionListener(e -> browseSource());
     }
 
-    private JLabel makeInfoIcon(String tooltip) {
-        Icon sys = UIManager.getIcon("OptionPane.informationIcon");
-        Icon small = sys;
-        try {
-            if (sys instanceof ImageIcon ii) {
-                Image scaled = ii.getImage().getScaledInstance(16, 16, Image.SCALE_SMOOTH);
-                small = new ImageIcon(scaled);
-            }
-        } catch (Exception ignored) {}
-        JLabel lbl = new JLabel(small);
-        lbl.setToolTipText(tooltip);
-        return lbl;
-    }
-
-    private void setupFolderIcon(AbstractButton btn, String tooltip) {
-        btn.setText("");
-        btn.setToolTipText(tooltip);
-        try {
-            var url = getClass().getResource("/icons/folder-open.png");
-            if (url != null) btn.setIcon(new ImageIcon(
-                    new ImageIcon(url).getImage().getScaledInstance(16,16, Image.SCALE_SMOOTH)
-            ));
-            else btn.setText("...");
-        } catch (Exception ex) { btn.setText("..."); }
-    }
-
-    private void chooseDirInto(JTextField targetField) {
-        File startDir = null;
-        String current = targetField.getText().trim();
-        if (!current.isEmpty()) {
-            try {
-                File f = new File(current);
-                if (f.exists()) startDir = f.isDirectory() ? f : f.getParentFile();
-            } catch (Exception ignored) {}
+    private void browseSource() {
+        File start = null;
+        String txt = txtSourceDir.getText().trim();
+        if (!txt.isEmpty()) {
+            File f = new File(txt);
+            start = f.isDirectory() ? f : f.getParentFile();
         }
-        final JFileChooser ch = (startDir != null) ? new JFileChooser(startDir) : new JFileChooser();
+        JFileChooser ch = new JFileChooser(start != null ? start : new File(System.getProperty("user.home")));
         ch.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        ch.setDialogTitle(Strings.get("source.dir.choose.tooltip"));
         if (ch.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             File dir = ch.getSelectedFile();
-            if (dir != null) targetField.setText(dir.getAbsolutePath());
+            txtSourceDir.setText(dir.getAbsolutePath());
         }
     }
 
-    // API
-    public String getSourceDir() { return txtSource.getText().trim(); }
-    public String getFilenameTemplate() { return txtFilenameTemplate.getText().trim(); }
-    public void   setFilenameTemplate(String tpl) { txtFilenameTemplate.setText(tpl == null ? "" : tpl); }
+    // --- связь с конфигом ---
+    public void bind(AppConfig cfg) {
+        txtSourceDir.setText(cfg.sourceDir != null ? cfg.sourceDir : "");
+        txtPattern.setText(cfg.filenameTemplate != null ? cfg.filenameTemplate : "*.*");
 
-    public boolean isCopyMode() { return rbCopy.isSelected(); }
-    public DateSource getDateSource() {
-        if (rbFromMeta.isSelected())    return DateSource.METADATA;
-        if (rbFromCreated.isSelected()) return DateSource.CREATED;
-        return DateSource.FILENAME;
-    }
-
-    public void setEnabledAll(boolean enabled) {
-        txtSource.setEnabled(enabled);
-        btnBrowseSource.setEnabled(enabled);
-        txtFilenameTemplate.setEnabled(enabled);
-        infoNameTpl.setEnabled(enabled);
-        rbFromName.setEnabled(enabled);
-        rbFromMeta.setEnabled(enabled);
-        rbFromCreated.setEnabled(enabled);
-        rbCopy.setEnabled(enabled);
-        rbMove.setEnabled(enabled);
-    }
-
-    public void applyConfig(AppConfig cfg) {
-        setFilenameTemplate(cfg.filenameTemplate == null ? "*.*" : cfg.filenameTemplate);
-        txtSource.setText(cfg.sourceDir == null ? "" : cfg.sourceDir);
         switch (cfg.dateSource) {
-            case METADATA -> rbFromMeta.setSelected(true);
-            case CREATED  -> rbFromCreated.setSelected(true);
-            default       -> rbFromName.setSelected(true);
+            case METADATA -> rbDateMetadata.setSelected(true);
+            case FILENAME -> rbDateFilename.setSelected(true);
+            case CREATED  -> rbDateCreated.setSelected(true);
         }
-        if (cfg.copyMode) rbCopy.setSelected(true); else rbMove.setSelected(true);
+        switch (cfg.mode) {
+            case COPY         -> rbCopy.setSelected(true);
+            case MOVE         -> rbMove.setSelected(true);
+            case COPY_ARCHIVE -> rbCopyArchive.setSelected(true);
+        }
     }
 
-    public void writeToConfig(AppConfig cfg) {
-        cfg.sourceDir = getSourceDir();
-        cfg.filenameTemplate = getFilenameTemplate().isBlank() ? "*.*" : getFilenameTemplate();
-        cfg.dateSource = getDateSource();
-        cfg.copyMode = isCopyMode();
-    }
+    public void saveTo(AppConfig cfg) {
+        cfg.sourceDir        = txtSourceDir.getText().trim();
+        cfg.filenameTemplate = txtPattern.getText().trim().isEmpty() ? "*.*" : txtPattern.getText().trim();
+        if (rbDateMetadata.isSelected()) cfg.dateSource = AppConfig.DateSource.METADATA;
+        else if (rbDateFilename.isSelected()) cfg.dateSource = AppConfig.DateSource.FILENAME;
+        else cfg.dateSource = AppConfig.DateSource.CREATED;
 
-    public void setOnSourceChanged(Runnable r)   { this.onSourceChanged = r; }
-    public void setOnTemplateChanged(Runnable r) { this.onTemplateChanged = r; }
-    private void fireSourceChanged()   { if (onSourceChanged != null) onSourceChanged.run(); }
-    private void fireTemplateChanged() { if (onTemplateChanged != null) onTemplateChanged.run(); }
+        if (rbCopy.isSelected()) cfg.mode = AppConfig.OperationMode.COPY;
+        else if (rbMove.isSelected()) cfg.mode = AppConfig.OperationMode.MOVE;
+        else cfg.mode = AppConfig.OperationMode.COPY_ARCHIVE;
+    }
 }
