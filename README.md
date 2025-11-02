@@ -1,7 +1,7 @@
 # SortIt — simple photo/video sorter for Windows
 
 One-click tool to organize photos/videos into date-based folders.  
-No install. Settings in `sortit.json`. Works on Windows (embedded runtime included).
+Settings in `sortit.json`. Works on Windows (embedded runtime included).
 
 ## ✨ Features
 - Source folder + file name pattern (`*.*`, `IMG_*.*`, `PXL_*.*`)
@@ -12,8 +12,8 @@ No install. Settings in `sortit.json`. Works on Windows (embedded runtime includ
 - Language switcher (RU/EN)
 
 ## ⬇ Download
-• Portable ZIP — unzip and run SortIt/SortIt.exe
-• MSI Installer — standard Windows installer (Start Menu shortcut, optional desktop shortcut)
+- Portable ZIP — unzip and run SortIt/SortIt.exe
+- MSI Installer — standard Windows installer (Start Menu shortcut, optional desktop shortcut)
 Java is **not** required (runtime included).
 
 ## How to use
