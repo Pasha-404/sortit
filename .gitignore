@@ -1,14 +1,11 @@
-.gradle
+.gradle/
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
 
 ### IntelliJ IDEA ###
-.idea/modules.xml
-.idea/jarRepositories.xml
-.idea/compiler.xml
-.idea/libraries/
+.idea/
 *.iws
 *.iml
 *.ipr
@@ -37,6 +34,12 @@ bin/
 
 ### VS Code ###
 .vscode/
+
+### Local runtime / tools ###
+.serena/
+sortit.json
+sort-*.log
+ref_screen.png
 
 ### Mac OS ###
 .DS_Store
