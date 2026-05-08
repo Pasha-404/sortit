@@ -19,7 +19,7 @@ public class DestPanel extends UiTheme.CardPanel {
         UiTheme.styleTextField(txtFolderTemplate);
 
         GridBagConstraints c = new GridBagConstraints();
-        c.insets = new Insets(4, 0, 4, 0);
+        c.insets = new Insets(0, 0, 0, 0);
         c.fill = GridBagConstraints.HORIZONTAL;
 
         c.gridx = 0;
@@ -31,29 +31,29 @@ public class DestPanel extends UiTheme.CardPanel {
         c.gridy = 1;
         c.gridwidth = 1;
         c.weightx = 0;
-        c.insets = new Insets(8, 0, 3, 14);
+        c.insets = new Insets(7, 0, 2, 12);
         add(UiTheme.label(Strings.get("dst.folder")), c);
 
         c.gridx = 1;
         c.weightx = 1;
-        c.insets = new Insets(8, 0, 3, 8);
+        c.insets = new Insets(7, 0, 2, 8);
         add(txtDestDir, c);
 
         c.gridx = 2;
         c.weightx = 0;
-        c.insets = new Insets(8, 0, 3, 0);
+        c.insets = new Insets(7, 0, 2, 0);
         add(btnBrowseDest, c);
 
         c.gridx = 0;
         c.gridy = 2;
         c.weightx = 0;
-        c.insets = new Insets(3, 0, 0, 14);
+        c.insets = new Insets(2, 0, 0, 12);
         add(UiTheme.label(Strings.get("dst.template")), c);
 
         c.gridx = 1;
         c.gridwidth = 2;
         c.weightx = 1;
-        c.insets = new Insets(3, 0, 0, 0);
+        c.insets = new Insets(2, 0, 0, 0);
         txtFolderTemplate.setToolTipText(Strings.get("hint.template"));
         add(txtFolderTemplate, c);
 

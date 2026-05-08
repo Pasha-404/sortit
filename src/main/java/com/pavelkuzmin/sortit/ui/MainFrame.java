@@ -48,8 +48,8 @@ public class MainFrame extends JFrame {
         initComponents();
         setWindowIcon();
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-        setMinimumSize(new Dimension(680, 430));
-        setPreferredSize(new Dimension(760, 480));
+        setMinimumSize(new Dimension(760, 500));
+        setPreferredSize(new Dimension(920, 560));
         buildUi();
         wireActions();
         restoreWindowPosition();
@@ -77,7 +77,7 @@ public class MainFrame extends JFrame {
         progressBar = new JProgressBar(0, 100);
         progressBar.setStringPainted(true);
         progressBar.setVisible(false);
-        progressBar.setPreferredSize(new Dimension(150, 18));
+        progressBar.setPreferredSize(new Dimension(150, 16));
     }
 
     private void buildUi() {
@@ -120,20 +120,46 @@ public class MainFrame extends JFrame {
     private JComponent content() {
         JPanel body = new JPanel();
         body.setOpaque(false);
-        body.setBorder(new EmptyBorder(12, 18, 12, 18));
-        body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+        body.setBorder(new EmptyBorder(10, 14, 10, 14));
+        body.setLayout(new GridBagLayout());
 
-        body.add(sourcePanel);
-        body.add(Box.createVerticalStrut(10));
-        body.add(destPanel);
-        body.add(Box.createVerticalStrut(12));
-        body.add(actions());
-        return body;
+        GridBagConstraints c = new GridBagConstraints();
+        c.gridx = 0;
+        c.weightx = 1;
+        c.fill = GridBagConstraints.HORIZONTAL;
+
+        c.gridy = 0;
+        c.insets = new Insets(0, 0, 8, 0);
+        body.add(sourcePanel, c);
+
+        c.gridy = 1;
+        c.insets = new Insets(0, 0, 10, 0);
+        body.add(destPanel, c);
+
+        c.gridy = 2;
+        c.insets = new Insets(0, 0, 0, 0);
+        body.add(actions(), c);
+
+        c.gridy = 3;
+        c.weighty = 1;
+        c.fill = GridBagConstraints.BOTH;
+        body.add(Box.createGlue(), c);
+
+        JScrollPane scrollPane = new JScrollPane(
+                body,
+                ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
+                ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
+        );
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        scrollPane.getViewport().setBackground(UiTheme.APP_BG);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(18);
+        return scrollPane;
     }
 
     private JPanel actions() {
         JPanel actions = new JPanel(new BorderLayout(18, 0));
         actions.setOpaque(false);
+        actions.setBorder(new EmptyBorder(0, 0, 0, 0));
         actions.add(btnSortIt, BorderLayout.WEST);
         actions.add(chkShowResults, BorderLayout.CENTER);
         return actions;
