@@ -7,7 +7,8 @@ Settings in `sortit.json`. Works on Windows (embedded runtime included).
 - Source folder + file name pattern (`*.*`, `IMG_*.*`, `PXL_*.*`)
 - Date source: **EXIF/metadata**, **file name**, or **file creation time**
 - Destination folders by template: `YYYY`, `YY`, `MM`, `DD` (separators allowed: `- _ .`)
-- Copy or Move
+- Copy, Move, or Move + archive copy
+- Automatic cleanup of result logs older than 24 hours
 - No registry; settings saved next to the EXE
 - Language switcher (RU/EN)
 
@@ -30,7 +31,7 @@ Created on first run next to `SortIt.exe`. Example:
       "sourceDir": "",
       "filenameTemplate": "*.*",
       "dateSource": "METADATA",  // METADATA | FILENAME | CREATED
-      "copyMode": true,
+      "mode": "COPY",            // COPY | MOVE | MOVE_ARCHIVE
       "destDir": "",
       "destTemplate": "YYYYMMDD",
       "showResults": false,
@@ -48,16 +49,6 @@ Created on first run next to `SortIt.exe`. Example:
 - **Conflicting names** → if the target already contains a file with the same name, the operation may fail; check the log.
 
 ## Roadmap
-
-- **UI improvements**  
-  Cleaner visual hierarchy, compact layout, clearer tooltips/helps, better accessibility (contrast, focus states).
-
-- **Log housekeeping**  
-  Automatic pruning of old logs (by age and/or size), optional rotation, quick “Open latest log” action.
-
-- **New copy mode: Copy & Archive**  
-  After a successful copy to the destination, move the original file into a user-defined **backup** folder.
-  Includes conflict handling and safe fallback (skip on failure).
 
 - **More built-in languages**  
   Expand beyond RU/EN (e.g., DE, ES, FR, IT, UK, PL) with a simple contribution guide for translations.

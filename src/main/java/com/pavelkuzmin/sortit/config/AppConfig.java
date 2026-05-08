@@ -3,56 +3,46 @@ package com.pavelkuzmin.sortit.config;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
-/**
- * Конфиг приложения. Совместим с прошлой версией:
- * - раньше был boolean copyMode (true = Copy, false = Move);
- * - теперь используем enum OperationMode, но при чтении старых конфигов
- *   copyMode будет автоматически транспонироваться в mode.
- */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class AppConfig {
 
     public enum DateSource {
-        METADATA,     // EXIF/metadata
-        FILENAME,     // дата из имени файла
-        CREATED       // дата создания файла
+        METADATA,
+        FILENAME,
+        CREATED
     }
 
     public enum OperationMode {
-        COPY,          // просто копировать
-        MOVE,          // переносить
-        COPY_ARCHIVE   // копировать, затем исходник перенести в BAK
+        COPY,
+        MOVE,
+        MOVE_ARCHIVE,
+        @Deprecated
+        COPY_ARCHIVE;
+
+        public OperationMode normalized() {
+            return this == COPY_ARCHIVE ? MOVE_ARCHIVE : this;
+        }
     }
 
-    // ----- i18n -----
     public String lang = "en";
 
-    // ----- Источник -----
     public String sourceDir = "";
     public String filenameTemplate = "*.*";
     public DateSource dateSource = DateSource.METADATA;
 
-    // ----- Режим -----
-    // старое поле, оставлено для обратной совместимости:
-    // true = COPY, false = MOVE
     @Deprecated
-    public Boolean copyMode; // может отсутствовать в новых конфигах
+    public Boolean copyMode;
 
-    // новое поле с режимом
     public OperationMode mode = OperationMode.COPY;
 
-    // ----- Назначение -----
     public String destDir = "";
     public String destTemplate = "YYYYMMDD";
 
-    // ----- Прочее -----
     public boolean showResults = false;
 
-    // позиция окна
     public Integer windowX;
     public Integer windowY;
 
-    // ----- Вспомогательное: маппинг со старого copyMode -----
     @JsonIgnore
     public void normalizeLegacyFields() {
         if (mode == null) {
@@ -62,6 +52,8 @@ public class AppConfig {
                 mode = OperationMode.COPY;
             }
         }
+        mode = mode.normalized();
+        copyMode = null;
         if (filenameTemplate == null || filenameTemplate.isBlank()) {
             filenameTemplate = "*.*";
         }
@@ -74,5 +66,26 @@ public class AppConfig {
         if (dateSource == null) {
             dateSource = DateSource.METADATA;
         }
+    }
+
+    public static AppConfig copyOf(AppConfig src) {
+        AppConfig copy = new AppConfig();
+        if (src == null) {
+            copy.normalizeLegacyFields();
+            return copy;
+        }
+        copy.lang = src.lang;
+        copy.sourceDir = src.sourceDir;
+        copy.filenameTemplate = src.filenameTemplate;
+        copy.dateSource = src.dateSource;
+        copy.copyMode = src.copyMode;
+        copy.mode = src.mode;
+        copy.destDir = src.destDir;
+        copy.destTemplate = src.destTemplate;
+        copy.showResults = src.showResults;
+        copy.windowX = src.windowX;
+        copy.windowY = src.windowY;
+        copy.normalizeLegacyFields();
+        return copy;
     }
 }
