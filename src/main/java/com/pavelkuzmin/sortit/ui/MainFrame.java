@@ -100,17 +100,16 @@ public class MainFrame extends JFrame {
         progressBar = new JProgressBar(0, 100);
     }
 
-    /** Ставим иконку окна строго из тех ресурсов, что у тебя есть:
+    /** Ставим иконку окна из реально используемых ресурсов:
      *  - приоритет: app-icon.png (в корне resources)
-     *  - запасной вариант: icons/app-icon.png
-     *  - ещё запасные: icons/app.ico или icons/app-icon.ico (через Toolkit)
+     *  - запасной вариант: icons/app.ico (через Toolkit)
      */
     private void setWindowIcon() {
         Image img = null;
         ClassLoader cl = getClass().getClassLoader();
 
         // 1) PNG в корне ресурсов
-        String[] pngCandidates = { "app-icon.png", "icons/app-icon.png" };
+        String[] pngCandidates = { "app-icon.png" };
         for (String path : pngCandidates) {
             try (var in = cl.getResourceAsStream(path)) {
                 if (in != null) {
@@ -122,7 +121,7 @@ public class MainFrame extends JFrame {
 
         // 2) Fallback: ICO через Toolkit (ImageIO .ico не понимает)
         if (img == null) {
-            String[] icoCandidates = { "icons/app.ico", "icons/app-icon.ico" };
+            String[] icoCandidates = { "icons/app.ico" };
             for (String path : icoCandidates) {
                 try {
                     var url = cl.getResource(path);
