@@ -34,7 +34,7 @@ public class SourcePanel extends UiTheme.CardPanel {
         UiTheme.styleRadio(rbMoveArchive);
 
         GridBagConstraints c = new GridBagConstraints();
-        c.insets = new Insets(4, 0, 4, 0);
+        c.insets = new Insets(0, 0, 0, 0);
         c.fill = GridBagConstraints.HORIZONTAL;
 
         c.gridx = 0;
@@ -46,29 +46,29 @@ public class SourcePanel extends UiTheme.CardPanel {
         c.gridy = 1;
         c.gridwidth = 1;
         c.weightx = 0;
-        c.insets = new Insets(8, 0, 3, 14);
+        c.insets = new Insets(7, 0, 2, 12);
         add(UiTheme.label(Strings.get("src.folder")), c);
 
         c.gridx = 1;
         c.weightx = 1;
-        c.insets = new Insets(8, 0, 3, 8);
+        c.insets = new Insets(7, 0, 2, 8);
         add(txtSourceDir, c);
 
         c.gridx = 2;
         c.weightx = 0;
-        c.insets = new Insets(8, 0, 3, 0);
+        c.insets = new Insets(7, 0, 2, 0);
         add(btnBrowseSource, c);
 
         c.gridx = 0;
         c.gridy = 2;
         c.weightx = 0;
-        c.insets = new Insets(3, 0, 8, 14);
+        c.insets = new Insets(2, 0, 5, 12);
         add(UiTheme.label(Strings.get("src.pattern")), c);
 
         c.gridx = 1;
         c.gridwidth = 2;
         c.weightx = 1;
-        c.insets = new Insets(3, 0, 8, 0);
+        c.insets = new Insets(2, 0, 5, 0);
         txtPattern.setToolTipText(Strings.get("hint.pattern"));
         add(txtPattern, c);
 
@@ -76,7 +76,7 @@ public class SourcePanel extends UiTheme.CardPanel {
         c.gridy = 3;
         c.gridwidth = 3;
         c.weightx = 1;
-        c.insets = new Insets(2, 0, 0, 0);
+        c.insets = new Insets(4, 130, 0, 48);
         add(optionsPanel(), c);
 
         btnBrowseSource.addActionListener(e -> browseSource());
@@ -112,7 +112,7 @@ public class SourcePanel extends UiTheme.CardPanel {
     }
 
     private JPanel optionsPanel() {
-        JPanel panel = new JPanel(new GridLayout(1, 2, 24, 0));
+        JPanel panel = new JPanel(new GridLayout(1, 2, 36, 0));
         panel.setOpaque(false);
         panel.add(radioColumn(Strings.get("src.date.title"), rbDateMetadata, rbDateFilename, rbDateCreated));
         panel.add(radioColumn(Strings.get("src.mode.title"), rbCopy, rbMove, rbMoveArchive));
@@ -125,11 +125,11 @@ public class SourcePanel extends UiTheme.CardPanel {
         GridBagConstraints c = new GridBagConstraints();
         c.anchor = GridBagConstraints.WEST;
         c.gridx = 0;
-        c.insets = new Insets(2, 0, 2, 0);
+        c.insets = new Insets(1, 0, 1, 0);
 
         JLabel header = new JLabel(title);
         header.setForeground(UiTheme.TEXT);
-        header.setFont(UiTheme.uiFont(Font.BOLD, 14f));
+        header.setFont(UiTheme.uiFont(Font.BOLD, 13f));
         c.gridy = 0;
         panel.add(header, c);
 
