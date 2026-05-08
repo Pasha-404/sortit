@@ -18,7 +18,7 @@ public final class Strings {
 
     /** Установить локаль по коду ("en" / "ru"). Любой другой код → en. */
     public static void setLocale(String code) {
-        Locale loc = "ru".equalsIgnoreCase(code) ? new Locale("ru") : Locale.ENGLISH;
+        Locale loc = "ru".equalsIgnoreCase(code) ? Locale.forLanguageTag("ru") : Locale.ENGLISH;
         current = loc;
         bundle = loadBundle(current);
     }
