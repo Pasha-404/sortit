@@ -48,8 +48,8 @@ public class MainFrame extends JFrame {
         initComponents();
         setWindowIcon();
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-        setMinimumSize(new Dimension(760, 560));
-        setPreferredSize(new Dimension(940, 640));
+        setMinimumSize(new Dimension(680, 430));
+        setPreferredSize(new Dimension(760, 480));
         buildUi();
         wireActions();
         restoreWindowPosition();
@@ -64,11 +64,11 @@ public class MainFrame extends JFrame {
         sourcePanel = new SourcePanel();
         destPanel = new DestPanel();
 
-        btnSortIt = primaryButton(Strings.get("run.button"));
+        btnSortIt = UiTheme.primaryButton(Strings.get("run.button"));
         chkShowResults = new JCheckBox(Strings.get("run.showResults"), false);
         chkShowResults.setOpaque(false);
         chkShowResults.setForeground(UiTheme.TEXT);
-        chkShowResults.setFont(UiTheme.uiFont(Font.PLAIN, 14f));
+        chkShowResults.setFont(UiTheme.uiFont(Font.PLAIN, 13f));
 
         lblStatus = new JLabel(Strings.get("status.ready"));
         lblStatus.setForeground(UiTheme.MUTED);
@@ -77,7 +77,7 @@ public class MainFrame extends JFrame {
         progressBar = new JProgressBar(0, 100);
         progressBar.setStringPainted(true);
         progressBar.setVisible(false);
-        progressBar.setPreferredSize(new Dimension(180, 22));
+        progressBar.setPreferredSize(new Dimension(150, 18));
     }
 
     private void buildUi() {
@@ -95,19 +95,19 @@ public class MainFrame extends JFrame {
         header.setBackground(Color.WHITE);
         header.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(0, 0, 1, 0, UiTheme.BORDER),
-                new EmptyBorder(16, 24, 16, 24)
+                new EmptyBorder(8, 18, 8, 18)
         ));
 
-        JPanel titleRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
+        JPanel titleRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 9, 0));
         titleRow.setOpaque(false);
-        JLabel icon = new JLabel(loadAppIcon(32));
+        JLabel icon = new JLabel(loadAppIcon(28));
         JLabel title = new JLabel("SortIt");
         title.setForeground(UiTheme.TEXT);
-        title.setFont(UiTheme.uiFont(Font.BOLD, 24f));
+        title.setFont(UiTheme.uiFont(Font.BOLD, 22f));
         titleRow.add(icon);
         titleRow.add(title);
 
-        JPanel langRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        JPanel langRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         langRow.setOpaque(false);
         langRow.add(UiTheme.label(Strings.get("lang.caption")));
         langRow.add(cmbLang);
@@ -120,21 +120,15 @@ public class MainFrame extends JFrame {
     private JComponent content() {
         JPanel body = new JPanel();
         body.setOpaque(false);
-        body.setBorder(new EmptyBorder(20, 24, 18, 24));
+        body.setBorder(new EmptyBorder(12, 18, 12, 18));
         body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
 
         body.add(sourcePanel);
-        body.add(Box.createVerticalStrut(14));
+        body.add(Box.createVerticalStrut(10));
         body.add(destPanel);
-        body.add(Box.createVerticalStrut(18));
+        body.add(Box.createVerticalStrut(12));
         body.add(actions());
-
-        JScrollPane scroll = new JScrollPane(body);
-        scroll.setBorder(null);
-        scroll.getViewport().setOpaque(false);
-        scroll.setOpaque(false);
-        scroll.getVerticalScrollBar().setUnitIncrement(18);
-        return scroll;
+        return body;
     }
 
     private JPanel actions() {
@@ -150,7 +144,7 @@ public class MainFrame extends JFrame {
         status.setBackground(Color.WHITE);
         status.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(1, 0, 0, 0, UiTheme.BORDER),
-                new EmptyBorder(12, 24, 12, 24)
+                new EmptyBorder(8, 18, 8, 18)
         ));
         status.add(lblStatus, BorderLayout.CENTER);
         status.add(progressBar, BorderLayout.EAST);
@@ -326,20 +320,6 @@ public class MainFrame extends JFrame {
         } catch (Exception ignore) {
             return new ImageIcon();
         }
-    }
-
-    private JButton primaryButton(String text) {
-        JButton button = new JButton(text);
-        button.setPreferredSize(new Dimension(320, 54));
-        button.setFont(UiTheme.uiFont(Font.BOLD, 22f));
-        button.setForeground(Color.WHITE);
-        button.setBackground(UiTheme.BLUE);
-        button.setFocusPainted(false);
-        button.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(UiTheme.BLUE_DARK, 1, true),
-                new EmptyBorder(10, 20, 10, 20)
-        ));
-        return button;
     }
 
     private static String text(JTextField field) {
