@@ -1,0 +1,50 @@
+name: Build Windows MSI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*'
+    paths:
+      - '.github/workflows/build-msi.yml'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle/**'
+      - 'gradlew.bat'
+      - 'src/**'
+
+jobs:
+  build-msi:
+    name: Build MSI
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '23'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install WiX Toolset
+        shell: powershell
+        run: choco install wixtoolset -y --no-progress
+
+      - name: Build and test MSI
+        shell: cmd
+        run: gradlew.bat clean test packMsi
+
+      - name: Upload MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SortIt-msi
+          path: build/jpackage/*.msi
+          if-no-files-found: error
+          retention-days: 30
