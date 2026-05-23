@@ -24,7 +24,7 @@ public final class ConfigIO {
             cfg.mode = AppConfig.OperationMode.COPY;
             cfg.destDir = "";
             cfg.destTemplate = "YYYYMMDD";
-            cfg.showResults = false;
+            cfg.showResults = true;
             return cfg;
         }
         try {

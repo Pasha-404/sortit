@@ -45,13 +45,7 @@ public final class UiTheme {
     }
 
     public static JButton secondaryButton(String text) {
-        JButton button = new JButton(text);
-        button.setFont(uiFont(Font.BOLD, 13f));
-        button.setForeground(TEXT);
-        button.setPreferredSize(new Dimension(40, 28));
-        button.setFocusPainted(false);
-        button.setMargin(new Insets(0, 0, 0, 0));
-        return button;
+        return new SecondaryButton(text);
     }
 
     public static JButton primaryButton(String text) {
@@ -105,23 +99,77 @@ public final class UiTheme {
             Color top = isEnabled() ? BLUE : new Color(94, 120, 154);
             Color bottom = isEnabled() ? BLUE_DARK : new Color(68, 92, 128);
             g2.setPaint(new GradientPaint(0, 0, top, 0, getHeight(), bottom));
-            g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+            int x = 1;
+            int y = 1;
+            int width = getWidth() - 3;
+            int height = getHeight() - 3;
+
+            g2.fillRoundRect(x, y, width, height, 10, 10);
 
             if (getModel().isPressed() && isEnabled()) {
                 g2.setColor(new Color(0, 0, 0, 30));
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                g2.fillRoundRect(x, y, width, height, 10, 10);
             }
 
             g2.setColor(new Color(255, 255, 255, isEnabled() ? 80 : 35));
-            g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
+            g2.drawRoundRect(x, y, width, height, 10, 10);
 
             g2.setFont(getFont());
             FontMetrics metrics = g2.getFontMetrics();
             String text = getText();
-            int x = (getWidth() - metrics.stringWidth(text)) / 2;
-            int y = (getHeight() - metrics.getHeight()) / 2 + metrics.getAscent();
+            int textX = (getWidth() - metrics.stringWidth(text)) / 2;
+            int textY = (getHeight() - metrics.getHeight()) / 2 + metrics.getAscent();
             g2.setColor(new Color(255, 255, 255, isEnabled() ? 255 : 220));
-            g2.drawString(text, x, y);
+            g2.drawString(text, textX, textY);
+            g2.dispose();
+        }
+    }
+
+    private static final class SecondaryButton extends JButton {
+        private SecondaryButton(String text) {
+            super(text);
+            setFont(uiFont(Font.BOLD, 13f));
+            setForeground(TEXT);
+            setPreferredSize(new Dimension(40, 28));
+            setFocusPainted(false);
+            setBorder(new EmptyBorder(6, 14, 6, 14));
+            setContentAreaFilled(false);
+            setOpaque(false);
+            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            Color fill = isEnabled()
+                    ? (getModel().isRollover() ? new Color(232, 241, 255) : Color.WHITE)
+                    : new Color(238, 242, 247);
+            Color border = isEnabled()
+                    ? (getModel().isRollover() ? new Color(120, 170, 245) : BORDER)
+                    : new Color(210, 218, 228);
+            g2.setColor(fill);
+            int x = 1;
+            int y = 1;
+            int width = getWidth() - 3;
+            int height = getHeight() - 3;
+
+            g2.fillRoundRect(x, y, width, height, 10, 10);
+            if (getModel().isPressed() && isEnabled()) {
+                g2.setColor(new Color(0, 106, 230, 24));
+                g2.fillRoundRect(x, y, width, height, 10, 10);
+            }
+            g2.setColor(border);
+            g2.drawRoundRect(x, y, width, height, 10, 10);
+
+            g2.setFont(getFont());
+            FontMetrics metrics = g2.getFontMetrics();
+            String text = getText();
+            int textX = (getWidth() - metrics.stringWidth(text)) / 2;
+            int textY = (getHeight() - metrics.getHeight()) / 2 + metrics.getAscent();
+            g2.setColor(isEnabled() ? getForeground() : new Color(124, 139, 158));
+            g2.drawString(text, textX, textY);
             g2.dispose();
         }
     }

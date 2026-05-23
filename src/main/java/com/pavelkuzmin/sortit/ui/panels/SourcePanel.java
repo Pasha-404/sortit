@@ -9,6 +9,8 @@ import java.awt.*;
 import java.io.File;
 
 public class SourcePanel extends UiTheme.CardPanel {
+    private final boolean showSourceFolder;
+
     public final JTextField txtSourceDir = new JTextField();
     public final JButton btnBrowseSource = UiTheme.secondaryButton("...");
 
@@ -23,6 +25,11 @@ public class SourcePanel extends UiTheme.CardPanel {
     public final JRadioButton rbMoveArchive = new JRadioButton(Strings.get("src.mode.moveArchive"));
 
     public SourcePanel() {
+        this(true);
+    }
+
+    public SourcePanel(boolean showSourceFolder) {
+        this.showSourceFolder = showSourceFolder;
         setLayout(new GridBagLayout());
         UiTheme.styleTextField(txtSourceDir);
         UiTheme.styleTextField(txtPattern);
@@ -43,26 +50,31 @@ public class SourcePanel extends UiTheme.CardPanel {
         c.weightx = 1;
         add(UiTheme.title(Strings.get("src.title")), c);
 
-        c.gridy = 1;
-        c.gridwidth = 1;
-        c.weightx = 0;
-        c.insets = new Insets(7, 0, 2, 12);
-        add(UiTheme.label(Strings.get("src.folder")), c);
+        int nextRow = 1;
 
-        c.gridx = 1;
-        c.weightx = 1;
-        c.insets = new Insets(7, 0, 2, 8);
-        add(txtSourceDir, c);
+        if (showSourceFolder) {
+            c.gridy = nextRow++;
+            c.gridwidth = 1;
+            c.weightx = 0;
+            c.insets = new Insets(7, 0, 2, 12);
+            add(UiTheme.label(Strings.get("src.folder")), c);
 
-        c.gridx = 2;
-        c.weightx = 0;
-        c.insets = new Insets(7, 0, 2, 0);
-        add(btnBrowseSource, c);
+            c.gridx = 1;
+            c.weightx = 1;
+            c.insets = new Insets(7, 0, 2, 8);
+            add(txtSourceDir, c);
+
+            c.gridx = 2;
+            c.weightx = 0;
+            c.insets = new Insets(7, 0, 2, 0);
+            add(btnBrowseSource, c);
+        }
 
         c.gridx = 0;
-        c.gridy = 2;
+        c.gridy = nextRow++;
+        c.gridwidth = 1;
         c.weightx = 0;
-        c.insets = new Insets(2, 0, 5, 12);
+        c.insets = new Insets(showSourceFolder ? 2 : 8, 0, 5, 12);
         add(UiTheme.label(Strings.get("src.pattern")), c);
 
         c.gridx = 1;
@@ -73,13 +85,15 @@ public class SourcePanel extends UiTheme.CardPanel {
         add(txtPattern, c);
 
         c.gridx = 0;
-        c.gridy = 3;
+        c.gridy = nextRow;
         c.gridwidth = 3;
         c.weightx = 1;
         c.insets = new Insets(4, 130, 0, 48);
         add(optionsPanel(), c);
 
-        btnBrowseSource.addActionListener(e -> browseSource());
+        if (showSourceFolder) {
+            btnBrowseSource.addActionListener(e -> browseSource());
+        }
     }
 
     public void bind(AppConfig cfg) {
@@ -100,7 +114,9 @@ public class SourcePanel extends UiTheme.CardPanel {
     }
 
     public void saveTo(AppConfig cfg) {
-        cfg.sourceDir = txtSourceDir.getText().trim();
+        if (showSourceFolder) {
+            cfg.sourceDir = txtSourceDir.getText().trim();
+        }
         cfg.filenameTemplate = txtPattern.getText().trim().isEmpty() ? "*.*" : txtPattern.getText().trim();
         if (rbDateMetadata.isSelected()) cfg.dateSource = AppConfig.DateSource.METADATA;
         else if (rbDateFilename.isSelected()) cfg.dateSource = AppConfig.DateSource.FILENAME;

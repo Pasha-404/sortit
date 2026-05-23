@@ -38,7 +38,7 @@ public class AppConfig {
     public String destDir = "";
     public String destTemplate = "YYYYMMDD";
 
-    public boolean showResults = false;
+    public boolean showResults = true;
 
     public Integer windowX;
     public Integer windowY;
