@@ -9,6 +9,8 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -86,6 +88,28 @@ class SortServiceTest {
         assertEquals(1, result.deletedOldLogs());
         assertFalse(Files.exists(oldLog));
         assertTrue(Files.exists(freshLog));
+    }
+
+    @Test
+    void runPublishesProgressAtStartAndAfterEveryFile() throws Exception {
+        Path sourceDir = Files.createDirectory(tempDir.resolve("src"));
+        Path destDir = Files.createDirectory(tempDir.resolve("dest"));
+        Files.writeString(sourceDir.resolve("IMG_20240501.jpg"), "one");
+        Files.writeString(sourceDir.resolve("IMG_20240502.jpg"), "two");
+        Files.writeString(sourceDir.resolve("IMG_20240503.jpg"), "three");
+        Files.writeString(sourceDir.resolve("IMG_20240504.jpg"), "four");
+
+        List<SortProgress> progressEvents = new ArrayList<>();
+        SortRunResult result = new SortService().run(
+                config(sourceDir, destDir, AppConfig.OperationMode.COPY),
+                tempDir,
+                SortService.Messages.english(),
+                progressEvents::add
+        );
+
+        assertEquals(0, result.errors());
+        assertEquals(List.of(0, 1, 2, 3, 4), progressEvents.stream().map(SortProgress::processed).toList());
+        assertTrue(progressEvents.stream().allMatch(progress -> progress.total() == 4));
     }
 
     private AppConfig config(Path sourceDir, Path destDir, AppConfig.OperationMode mode) {

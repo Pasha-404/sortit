@@ -61,6 +61,8 @@ public final class SortService {
             return new SortRunResult(processed, total, errors, logPath, deletedOldLogs);
         }
 
+        notifyProgress(listener, new SortProgress(0, total, 0));
+
         Path bakRoot = sourceRoot.resolve("BAK");
         for (Path srcFile : files) {
             String name = srcFile.getFileName().toString();
@@ -79,9 +81,7 @@ public final class SortService {
             }
 
             processed++;
-            if (shouldPublish(processed, total)) {
-                notifyProgress(listener, new SortProgress(processed, total, errors));
-            }
+            notifyProgress(listener, new SortProgress(processed, total, errors));
         }
 
         Path logPath = writeLog(resolvedLogDir, finishLog(log, runConfig, processed, total, errors));
@@ -272,10 +272,6 @@ public final class SortService {
         } catch (Exception ignore) {
             return null;
         }
-    }
-
-    private static boolean shouldPublish(int processed, int total) {
-        return processed == total || processed % 5 == 0;
     }
 
     private static void notifyProgress(ProgressListener listener, SortProgress progress) {

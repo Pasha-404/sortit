@@ -512,6 +512,7 @@ public class MainFrame extends JFrame {
         setUiEnabled(false);
         lblStatus.setText(Strings.get("status.running"));
         progressBar.setVisible(true);
+        progressBar.setIndeterminate(true);
         progressBar.setValue(0);
         progressBar.setString("0%");
 
@@ -768,6 +769,7 @@ public class MainFrame extends JFrame {
             SortProgress progress = chunks.get(chunks.size() - 1);
             if (progress.total() > 0) {
                 int percent = Math.min(100, Math.max(0, (int) Math.round(100.0 * progress.processed() / progress.total())));
+                progressBar.setIndeterminate(progress.processed() == 0);
                 progressBar.setValue(percent);
                 progressBar.setString(percent + "%");
             }
@@ -782,6 +784,7 @@ public class MainFrame extends JFrame {
         @Override
         protected void done() {
             setUiEnabled(true);
+            progressBar.setIndeterminate(false);
             progressBar.setVisible(false);
             try {
                 SortRunResult result = get();
