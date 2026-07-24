@@ -9,7 +9,7 @@ Settings in `sortit.json`. Works on Windows (embedded runtime included).
 - Destination folders by template: `YYYY`, `YY`, `MM`, `DD` (separators allowed: `- _ .`)
 - Copy, Move, or Move + archive copy
 - Automatic cleanup of result logs older than 24 hours
-- No registry; settings saved next to the EXE
+- No registry; settings and logs saved next to the EXE
 - Language switcher (RU/EN)
 
 ## ⬇ Download
@@ -24,7 +24,7 @@ Java is **not** required (runtime included).
 4. Click **▶ SortIt**. Optionally show the result log after processing.
 
 ## Settings (`sortit.json`)
-Created on first run next to `SortIt.exe`. Example:
+Created on first run next to `SortIt.exe`. Settings from older versions are migrated automatically. Example:
 
     {
       "lang": "en",
@@ -34,7 +34,7 @@ Created on first run next to `SortIt.exe`. Example:
       "mode": "COPY",            // COPY | MOVE | MOVE_ARCHIVE
       "destDir": "",
       "destTemplate": "YYYYMMDD",
-      "showResults": false,
+      "showResults": true,
       "windowX": 120,
       "windowY": 120
     }

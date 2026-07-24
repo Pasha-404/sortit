@@ -1,10 +1,11 @@
 package com.pavelkuzmin.sortit.core;
 
 import com.drew.imaging.ImageMetadataReader;
-import com.drew.metadata.Directory;
 import com.drew.metadata.Metadata;
+import com.drew.metadata.avi.AviDirectory;
 import com.drew.metadata.exif.ExifIFD0Directory;
 import com.drew.metadata.exif.ExifSubIFDDirectory;
+import com.drew.metadata.mov.QuickTimeDirectory;
 import com.drew.metadata.mp4.Mp4Directory;
 
 import java.io.File;
@@ -27,54 +28,47 @@ public final class MediaDateExtractor {
 
             // 1) EXIF SubIFD — Date/Time Original (основной для фото)
             ExifSubIFDDirectory sub = md.getFirstDirectoryOfType(ExifSubIFDDirectory.class);
-            if (sub != null) {
-                Date d =
-                        sub.getDate(ExifSubIFDDirectory.TAG_DATETIME_ORIGINAL);
-                if (d == null) d = sub.getDate(ExifSubIFDDirectory.TAG_DATETIME_DIGITIZED);
-                if (d == null) d = sub.getDate(ExifSubIFDDirectory.TAG_DATETIME);
-                if (d != null) return d;
-            }
+            Date date = firstDate(
+                    sub,
+                    ExifSubIFDDirectory.TAG_DATETIME_ORIGINAL,
+                    ExifSubIFDDirectory.TAG_DATETIME_DIGITIZED,
+                    ExifSubIFDDirectory.TAG_DATETIME
+            );
+            if (date != null) return date;
 
             // 2) EXIF IFD0 — иногда встречается
             ExifIFD0Directory ifd0 = md.getFirstDirectoryOfType(ExifIFD0Directory.class);
-            if (ifd0 != null) {
-                Date d = ifd0.getDate(ExifIFD0Directory.TAG_DATETIME);
-                if (d != null) return d;
-            }
+            date = firstDate(ifd0, ExifIFD0Directory.TAG_DATETIME);
+            if (date != null) return date;
 
-            // 3) MP4/MOV — через Mp4Directory (если доступен). Часто теги: Creation Time / Modification Time
+            // 3) MP4 — embedded creation/modification time.
             Mp4Directory mp4 = md.getFirstDirectoryOfType(Mp4Directory.class);
-            if (mp4 != null) {
-                // Попробуем стандартные теги
-                // В разных версиях lib могут быть разные константы: используем getDate(int) перебором известных.
-                int[] candidates = {
-                        // Creation/Modification — часто встречаются
-                        Mp4Directory.TAG_CREATION_TIME,
-                        Mp4Directory.TAG_MODIFICATION_TIME
-                };
-                for (int tag : candidates) {
-                    try {
-                        Date d = mp4.getDate(tag);
-                        if (d != null) return d;
-                    } catch (Throwable ignore) {}
-                }
-            }
+            date = firstDate(mp4, Mp4Directory.TAG_CREATION_TIME, Mp4Directory.TAG_MODIFICATION_TIME);
+            if (date != null) return date;
 
-            // 4) Последняя надежда: пройтись по всем директориям и вытянуть первый Date
-            for (Directory dir : md.getDirectories()) {
-                for (com.drew.metadata.Tag t : dir.getTags()) {
-                    if (t.getTagName() != null && t.getTagName().toLowerCase().contains("date")) {
-                        try {
-                            Date d = dir.getDate(t.getTagType());
-                            if (d != null) return d;
-                        } catch (Throwable ignore) {}
-                    }
-                }
-            }
+            // 4) MOV/QuickTime and AVI have their own explicit creation tags.
+            QuickTimeDirectory quickTime = md.getFirstDirectoryOfType(QuickTimeDirectory.class);
+            date = firstDate(quickTime, QuickTimeDirectory.TAG_CREATION_TIME, QuickTimeDirectory.TAG_MODIFICATION_TIME);
+            if (date != null) return date;
 
-            return null;
+            AviDirectory avi = md.getFirstDirectoryOfType(AviDirectory.class);
+            return firstDate(avi, AviDirectory.TAG_DATETIME_ORIGINAL);
+
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private static Date firstDate(com.drew.metadata.Directory directory, int... tags) {
+        if (directory == null) return null;
+        for (int tag : tags) {
+            try {
+                Date date = directory.getDate(tag);
+                if (date != null) return date;
+            } catch (RuntimeException ignore) {
+                // A malformed metadata tag should not block processing other files.
+            }
+        }
+        return null;
     }
 }

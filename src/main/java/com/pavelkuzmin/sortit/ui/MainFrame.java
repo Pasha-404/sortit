@@ -1,6 +1,7 @@
 package com.pavelkuzmin.sortit.ui;
 
 import com.pavelkuzmin.sortit.config.AppConfig;
+import com.pavelkuzmin.sortit.config.AppPaths;
 import com.pavelkuzmin.sortit.config.ConfigIO;
 import com.pavelkuzmin.sortit.core.SortProgress;
 import com.pavelkuzmin.sortit.core.SortRunResult;
@@ -20,13 +21,14 @@ import java.awt.event.ComponentEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.text.MessageFormat;
 import java.util.List;
 import java.util.Objects;
 
 public class MainFrame extends JFrame {
-    private static final Path LOG_DIR = Path.of(".").toAbsolutePath().normalize();
+    private static final Path LOG_DIR = AppPaths.logDirectory();
 
     private JTextField txtSourceDir;
     private JButton btnBrowseSource;
@@ -56,7 +58,7 @@ public class MainFrame extends JFrame {
 
         initComponents();
         setWindowIcon();
-        setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         setMinimumSize(new Dimension(760, 440));
         setPreferredSize(new Dimension(900, 520));
         buildUi();
@@ -393,10 +395,15 @@ public class MainFrame extends JFrame {
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
+                if (worker != null && !worker.isDone()) {
+                    lblStatus.setText(Strings.get("status.close.wait"));
+                    return;
+                }
                 config.windowX = getX();
                 config.windowY = getY();
                 saveCurrentUiToConfig();
-                ConfigIO.save(config);
+                saveConfig();
+                dispose();
             }
         });
     }
@@ -434,7 +441,7 @@ public class MainFrame extends JFrame {
 
         config = dialog.selectedConfig();
         config.normalizeLegacyFields();
-        ConfigIO.save(config);
+        saveConfig();
 
         if (!Objects.equals(oldLang, config.lang)) {
             Point p = getLocation();
@@ -496,7 +503,7 @@ public class MainFrame extends JFrame {
         if (worker != null && !worker.isDone()) return;
 
         saveCurrentUiToConfig();
-        ConfigIO.save(config);
+        saveConfig();
 
         Path source = SortService.safePath(config.sourceDir);
         Path dest = SortService.safePath(config.destDir);
@@ -525,6 +532,17 @@ public class MainFrame extends JFrame {
         btnSettings.setEnabled(enabled);
         txtSourceDir.setEnabled(enabled);
         btnBrowseSource.setEnabled(enabled);
+    }
+
+    private boolean saveConfig() {
+        if (ConfigIO.save(config)) return true;
+        JOptionPane.showMessageDialog(
+                this,
+                Strings.get("config.save.failed"),
+                "SortIt",
+                JOptionPane.ERROR_MESSAGE
+        );
+        return false;
     }
 
     private void restoreWindowPosition() {
@@ -790,11 +808,27 @@ public class MainFrame extends JFrame {
                 SortRunResult result = get();
                 lblStatus.setText(MessageFormat.format(Strings.get("status.done"), result.processed(), result.errors()));
                 if (config.showResults && result.logPath() != null) {
-                    Desktop.getDesktop().open(result.logPath().toFile());
+                    openResultLog(result.logPath());
                 }
             } catch (Exception ex) {
                 lblStatus.setText(Strings.get("status.failed"));
             }
+        }
+    }
+
+    private void openResultLog(Path logPath) {
+        try {
+            if (!Desktop.isDesktopSupported()) throw new UnsupportedOperationException();
+            Desktop desktop = Desktop.getDesktop();
+            if (!desktop.isSupported(Desktop.Action.OPEN)) throw new UnsupportedOperationException();
+            desktop.open(logPath.toFile());
+        } catch (IOException | RuntimeException ex) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    MessageFormat.format(Strings.get("log.open.failed"), logPath.toAbsolutePath()),
+                    "SortIt",
+                    JOptionPane.WARNING_MESSAGE
+            );
         }
     }
 }

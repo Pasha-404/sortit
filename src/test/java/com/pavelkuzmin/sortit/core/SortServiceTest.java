@@ -75,6 +75,56 @@ class SortServiceTest {
     }
 
     @Test
+    void unsafeFolderTemplateDoesNotWriteOutsideDestination() throws Exception {
+        Path sourceDir = Files.createDirectory(tempDir.resolve("src"));
+        Path destDir = Files.createDirectory(tempDir.resolve("dest"));
+        Path file = Files.writeString(sourceDir.resolve("IMG_20240506.jpg"), "photo");
+        AppConfig cfg = config(sourceDir, destDir, AppConfig.OperationMode.COPY);
+        cfg.destTemplate = "..";
+
+        SortRunResult result = new SortService().run(cfg, tempDir, SortService.Messages.english(), null);
+
+        assertEquals(1, result.errors());
+        assertTrue(Files.exists(file));
+        assertFalse(Files.exists(tempDir.resolve(file.getFileName())));
+        assertFalse(Files.exists(destDir.resolve(file.getFileName())));
+    }
+
+    @Test
+    void moveArchiveModeContinuesWhenMatchingBackupAlreadyExists() throws Exception {
+        Path sourceDir = Files.createDirectory(tempDir.resolve("src"));
+        Path destDir = Files.createDirectory(tempDir.resolve("dest"));
+        Path file = Files.writeString(sourceDir.resolve("IMG_20240506.jpg"), "photo");
+        Path backup = Files.createDirectories(sourceDir.resolve("BAK").resolve("20240506"))
+                .resolve(file.getFileName());
+        Files.writeString(backup, "photo");
+
+        SortRunResult result = new SortService().run(config(sourceDir, destDir, AppConfig.OperationMode.MOVE_ARCHIVE), tempDir, SortService.Messages.english(), null);
+
+        assertEquals(0, result.errors());
+        assertFalse(Files.exists(file));
+        assertEquals("photo", Files.readString(destDir.resolve("20240506").resolve(file.getFileName())));
+        assertEquals("photo", Files.readString(backup));
+    }
+
+    @Test
+    void moveArchiveModeRejectsDifferentExistingBackup() throws Exception {
+        Path sourceDir = Files.createDirectory(tempDir.resolve("src"));
+        Path destDir = Files.createDirectory(tempDir.resolve("dest"));
+        Path file = Files.writeString(sourceDir.resolve("IMG_20240506.jpg"), "new photo");
+        Path backup = Files.createDirectories(sourceDir.resolve("BAK").resolve("20240506"))
+                .resolve(file.getFileName());
+        Files.writeString(backup, "old photo");
+
+        SortRunResult result = new SortService().run(config(sourceDir, destDir, AppConfig.OperationMode.MOVE_ARCHIVE), tempDir, SortService.Messages.english(), null);
+
+        assertEquals(1, result.errors());
+        assertTrue(Files.exists(file));
+        assertFalse(Files.exists(destDir.resolve("20240506").resolve(file.getFileName())));
+        assertEquals("old photo", Files.readString(backup));
+    }
+
+    @Test
     void runDeletesSortLogsOlderThanOneDay() throws Exception {
         Path sourceDir = Files.createDirectory(tempDir.resolve("src"));
         Path destDir = Files.createDirectory(tempDir.resolve("dest"));

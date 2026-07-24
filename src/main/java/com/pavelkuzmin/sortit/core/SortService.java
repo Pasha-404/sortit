@@ -4,6 +4,7 @@ import com.pavelkuzmin.sortit.config.AppConfig;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
@@ -16,6 +17,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
@@ -63,7 +67,8 @@ public final class SortService {
 
         notifyProgress(listener, new SortProgress(0, total, 0));
 
-        Path bakRoot = sourceRoot.resolve("BAK");
+        Path normalizedDestRoot = destRoot.toAbsolutePath().normalize();
+        Path bakRoot = sourceRoot.resolve("BAK").toAbsolutePath().normalize();
         for (Path srcFile : files) {
             String name = srcFile.getFileName().toString();
             try {
@@ -73,7 +78,14 @@ public final class SortService {
                     logError(log, name, logMessages.noDate());
                 } else {
                     String subFolder = formatByTemplate(runConfig.destTemplate, date);
-                    errors += processFile(runConfig.mode, srcFile, destRoot.resolve(subFolder), bakRoot.resolve(subFolder), log);
+                    if (subFolder == null) {
+                        errors++;
+                        logError(log, name, "invalid destination folder template");
+                    } else {
+                        Path destFolder = resolveSafeFolder(normalizedDestRoot, subFolder);
+                        Path bakFolder = resolveSafeFolder(bakRoot, subFolder);
+                        errors += processFile(runConfig.mode, srcFile, destFolder, bakFolder, log);
+                    }
                 }
             } catch (Exception ex) {
                 errors++;
@@ -196,7 +208,16 @@ public final class SortService {
         out = out.replace("MM", String.format("%02d", date.getMonthValue()));
         out = out.replace("DD", String.format("%02d", date.getDayOfMonth()));
         out = out.replaceAll("[^0-9._-]", "");
-        return out.isBlank() ? "UNKNOWN" : out;
+        return out.isBlank() ? "UNKNOWN" : (".".equals(out) || "..".equals(out) ? null : out);
+    }
+
+    private static Path resolveSafeFolder(Path root, String folderName) throws IOException {
+        Path normalizedRoot = root.toAbsolutePath().normalize();
+        Path resolved = normalizedRoot.resolve(folderName).normalize();
+        if (!resolved.startsWith(normalizedRoot) || resolved.equals(normalizedRoot)) {
+            throw new IOException("Invalid destination folder template");
+        }
+        return resolved;
     }
 
     private static int processFile(
@@ -222,18 +243,40 @@ public final class SortService {
             case MOVE_ARCHIVE -> {
                 Path bakPath = bakFolder.resolve(name);
                 if (Files.exists(bakPath)) {
-                    logError(log, name, "already exists in BAK: " + bakPath);
-                    return 1;
+                    if (!hasSameContent(source, bakPath)) {
+                        logError(log, name, "different file already exists in BAK: " + bakPath);
+                        return 1;
+                    }
+                } else {
+                    Files.createDirectories(bakFolder);
+                    copyToNewFile(source, bakPath);
                 }
-
-                Files.createDirectories(bakFolder);
-                copyToNewFile(source, bakPath);
                 Files.move(source, destPath);
             }
             case COPY_ARCHIVE -> throw new IllegalStateException("Unexpected legacy mode");
         }
 
         return 0;
+    }
+
+    private static boolean hasSameContent(Path first, Path second) throws IOException {
+        if (Files.size(first) != Files.size(second)) return false;
+        return Arrays.equals(sha256(first), sha256(second));
+    }
+
+    private static byte[] sha256(Path file) throws IOException {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (InputStream input = Files.newInputStream(file)) {
+                byte[] buffer = new byte[8192];
+                for (int read; (read = input.read(buffer)) != -1; ) {
+                    digest.update(buffer, 0, read);
+                }
+            }
+            return digest.digest();
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IOException("SHA-256 is unavailable", ex);
+        }
     }
 
     private static void copyToNewFile(Path source, Path target) throws IOException {
