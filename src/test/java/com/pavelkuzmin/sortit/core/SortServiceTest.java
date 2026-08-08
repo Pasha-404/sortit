@@ -45,6 +45,23 @@ class SortServiceTest {
     }
 
     @Test
+    void moveModeLeavesNoTemporaryFilesInDestination() throws Exception {
+        Path sourceDir = Files.createDirectory(tempDir.resolve("src"));
+        Path destDir = Files.createDirectory(tempDir.resolve("dest"));
+        Path file = Files.writeString(sourceDir.resolve("IMG_20240506.jpg"), "photo");
+
+        SortRunResult result = new SortService().run(config(sourceDir, destDir, AppConfig.OperationMode.MOVE), tempDir, SortService.Messages.english(), null);
+
+        Path destinationFolder = destDir.resolve("20240506");
+        assertEquals(0, result.errors());
+        assertFalse(Files.exists(file));
+        assertEquals("photo", Files.readString(destinationFolder.resolve(file.getFileName())));
+        try (var files = Files.list(destinationFolder)) {
+            assertTrue(files.noneMatch(path -> path.getFileName().toString().contains(".sortit-")));
+        }
+    }
+
+    @Test
     void moveArchiveModeMovesToDestinationAndKeepsBackupCopy() throws Exception {
         Path sourceDir = Files.createDirectory(tempDir.resolve("src"));
         Path destDir = Files.createDirectory(tempDir.resolve("dest"));

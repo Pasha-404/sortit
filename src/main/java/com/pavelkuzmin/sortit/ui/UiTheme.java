@@ -99,10 +99,10 @@ public final class UiTheme {
             Color top = isEnabled() ? BLUE : new Color(94, 120, 154);
             Color bottom = isEnabled() ? BLUE_DARK : new Color(68, 92, 128);
             g2.setPaint(new GradientPaint(0, 0, top, 0, getHeight(), bottom));
-            int x = 1;
-            int y = 1;
-            int width = getWidth() - 3;
-            int height = getHeight() - 3;
+            int x = 0;
+            int y = 0;
+            int width = Math.max(0, getWidth() - 1);
+            int height = Math.max(0, getHeight() - 1);
 
             g2.fillRoundRect(x, y, width, height, 10, 10);
 
@@ -117,8 +117,8 @@ public final class UiTheme {
             g2.setFont(getFont());
             FontMetrics metrics = g2.getFontMetrics();
             String text = getText();
-            int textX = (getWidth() - metrics.stringWidth(text)) / 2;
-            int textY = (getHeight() - metrics.getHeight()) / 2 + metrics.getAscent();
+            int textX = x + (width - metrics.stringWidth(text)) / 2;
+            int textY = y + (height - metrics.getHeight()) / 2 + metrics.getAscent();
             g2.setColor(new Color(255, 255, 255, isEnabled() ? 255 : 220));
             g2.drawString(text, textX, textY);
             g2.dispose();
@@ -150,10 +150,10 @@ public final class UiTheme {
                     ? (getModel().isRollover() ? new Color(120, 170, 245) : BORDER)
                     : new Color(210, 218, 228);
             g2.setColor(fill);
-            int x = 1;
-            int y = 1;
-            int width = getWidth() - 3;
-            int height = getHeight() - 3;
+            int x = 0;
+            int y = 0;
+            int width = Math.max(0, getWidth() - 1);
+            int height = Math.max(0, getHeight() - 1);
 
             g2.fillRoundRect(x, y, width, height, 10, 10);
             if (getModel().isPressed() && isEnabled()) {
@@ -166,8 +166,8 @@ public final class UiTheme {
             g2.setFont(getFont());
             FontMetrics metrics = g2.getFontMetrics();
             String text = getText();
-            int textX = (getWidth() - metrics.stringWidth(text)) / 2;
-            int textY = (getHeight() - metrics.getHeight()) / 2 + metrics.getAscent();
+            int textX = x + (width - metrics.stringWidth(text)) / 2;
+            int textY = y + (height - metrics.getHeight()) / 2 + metrics.getAscent();
             g2.setColor(isEnabled() ? getForeground() : new Color(124, 139, 158));
             g2.drawString(text, textX, textY);
             g2.dispose();

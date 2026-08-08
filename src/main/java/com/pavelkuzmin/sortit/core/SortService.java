@@ -239,7 +239,7 @@ public final class SortService {
 
         switch (mode.normalized()) {
             case COPY -> copyToNewFile(source, destPath);
-            case MOVE -> Files.move(source, destPath);
+            case MOVE -> moveToNewFile(source, destPath);
             case MOVE_ARCHIVE -> {
                 Path bakPath = bakFolder.resolve(name);
                 if (Files.exists(bakPath)) {
@@ -251,12 +251,31 @@ public final class SortService {
                     Files.createDirectories(bakFolder);
                     copyToNewFile(source, bakPath);
                 }
-                Files.move(source, destPath);
+                moveToNewFile(source, destPath);
             }
             case COPY_ARCHIVE -> throw new IllegalStateException("Unexpected legacy mode");
         }
 
         return 0;
+    }
+
+    private static void moveToNewFile(Path source, Path target) throws IOException {
+        copyToNewFile(source, target);
+        if (Files.size(source) != Files.size(target)) {
+            IOException mismatch = new IOException("Destination copy size does not match source: " + target);
+            try {
+                Files.deleteIfExists(target);
+            } catch (IOException cleanupError) {
+                mismatch.addSuppressed(cleanupError);
+            }
+            throw mismatch;
+        }
+
+        try {
+            Files.deleteIfExists(source);
+        } catch (IOException ex) {
+            throw new SourceCleanupException(source, target, ex);
+        }
     }
 
     private static boolean hasSameContent(Path first, Path second) throws IOException {
@@ -276,6 +295,12 @@ public final class SortService {
             return digest.digest();
         } catch (NoSuchAlgorithmException ex) {
             throw new IOException("SHA-256 is unavailable", ex);
+        }
+    }
+
+    private static final class SourceCleanupException extends IOException {
+        private SourceCleanupException(Path source, Path target, IOException cause) {
+            super("Copied to " + target + ", but source could not be deleted: " + source, cause);
         }
     }
 
