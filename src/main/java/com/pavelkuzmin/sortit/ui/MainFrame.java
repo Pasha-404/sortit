@@ -587,6 +587,7 @@ public class MainFrame extends JFrame {
     private String summaryKey(AppConfig.OperationMode mode) {
         return switch (mode.normalized()) {
             case COPY -> "main.summary.copy";
+            case COPY_NEW_ONLY -> "main.summary.copyNewOnly";
             case MOVE -> "main.summary.move";
             case MOVE_ARCHIVE -> "main.summary.moveArchive";
             case COPY_ARCHIVE -> "main.summary.moveArchive";
@@ -604,6 +605,7 @@ public class MainFrame extends JFrame {
     private String modeText(AppConfig.OperationMode mode) {
         return switch (mode.normalized()) {
             case COPY -> Strings.get("src.mode.copy");
+            case COPY_NEW_ONLY -> Strings.get("src.mode.copyNewOnly");
             case MOVE -> Strings.get("src.mode.move");
             case MOVE_ARCHIVE -> Strings.get("src.mode.moveArchive");
             case COPY_ARCHIVE -> Strings.get("src.mode.moveArchive");
@@ -696,7 +698,7 @@ public class MainFrame extends JFrame {
             root.add(settingsFooter(), BorderLayout.SOUTH);
             setContentPane(root);
             setMinimumSize(new Dimension(720, 430));
-            setPreferredSize(new Dimension(820, 500));
+            setPreferredSize(new Dimension(820, 522));
             pack();
             setLocationRelativeTo(MainFrame.this);
         }
@@ -806,7 +808,14 @@ public class MainFrame extends JFrame {
             progressBar.setVisible(false);
             try {
                 SortRunResult result = get();
-                lblStatus.setText(MessageFormat.format(Strings.get("status.done"), result.processed(), result.errors()));
+                if (result.skipped() > 0 || result.warnings() > 0) {
+                    lblStatus.setText(MessageFormat.format(
+                            Strings.get("status.done.details"),
+                            result.processed(), result.skipped(), result.warnings(), result.errors()
+                    ));
+                } else {
+                    lblStatus.setText(MessageFormat.format(Strings.get("status.done"), result.processed(), result.errors()));
+                }
                 if (config.showResults && result.logPath() != null) {
                     openResultLog(result.logPath());
                 }

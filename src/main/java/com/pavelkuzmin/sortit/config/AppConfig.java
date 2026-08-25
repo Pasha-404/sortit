@@ -14,6 +14,7 @@ public class AppConfig {
 
     public enum OperationMode {
         COPY,
+        COPY_NEW_ONLY,
         MOVE,
         MOVE_ARCHIVE,
         @Deprecated

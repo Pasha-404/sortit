@@ -21,6 +21,7 @@ public class SourcePanel extends UiTheme.CardPanel {
     public final JRadioButton rbDateCreated = new JRadioButton(Strings.get("src.date.created"));
 
     public final JRadioButton rbCopy = new JRadioButton(Strings.get("src.mode.copy"));
+    public final JRadioButton rbCopyNewOnly = new JRadioButton(Strings.get("src.mode.copyNewOnly"));
     public final JRadioButton rbMove = new JRadioButton(Strings.get("src.mode.move"));
     public final JRadioButton rbMoveArchive = new JRadioButton(Strings.get("src.mode.moveArchive"));
 
@@ -37,6 +38,7 @@ public class SourcePanel extends UiTheme.CardPanel {
         UiTheme.styleRadio(rbDateFilename);
         UiTheme.styleRadio(rbDateCreated);
         UiTheme.styleRadio(rbCopy);
+        UiTheme.styleRadio(rbCopyNewOnly);
         UiTheme.styleRadio(rbMove);
         UiTheme.styleRadio(rbMoveArchive);
 
@@ -107,6 +109,7 @@ public class SourcePanel extends UiTheme.CardPanel {
         }
         switch (cfg.mode.normalized()) {
             case COPY -> rbCopy.setSelected(true);
+            case COPY_NEW_ONLY -> rbCopyNewOnly.setSelected(true);
             case MOVE -> rbMove.setSelected(true);
             case MOVE_ARCHIVE -> rbMoveArchive.setSelected(true);
             case COPY_ARCHIVE -> rbMoveArchive.setSelected(true);
@@ -123,6 +126,7 @@ public class SourcePanel extends UiTheme.CardPanel {
         else cfg.dateSource = AppConfig.DateSource.CREATED;
 
         if (rbCopy.isSelected()) cfg.mode = AppConfig.OperationMode.COPY;
+        else if (rbCopyNewOnly.isSelected()) cfg.mode = AppConfig.OperationMode.COPY_NEW_ONLY;
         else if (rbMove.isSelected()) cfg.mode = AppConfig.OperationMode.MOVE;
         else cfg.mode = AppConfig.OperationMode.MOVE_ARCHIVE;
     }
@@ -131,11 +135,11 @@ public class SourcePanel extends UiTheme.CardPanel {
         JPanel panel = new JPanel(new GridLayout(1, 2, 36, 0));
         panel.setOpaque(false);
         panel.add(radioColumn(Strings.get("src.date.title"), rbDateMetadata, rbDateFilename, rbDateCreated));
-        panel.add(radioColumn(Strings.get("src.mode.title"), rbCopy, rbMove, rbMoveArchive));
+        panel.add(radioColumn(Strings.get("src.mode.title"), rbCopy, rbCopyNewOnly, rbMove, rbMoveArchive));
         return panel;
     }
 
-    private JPanel radioColumn(String title, JRadioButton first, JRadioButton second, JRadioButton third) {
+    private JPanel radioColumn(String title, JRadioButton... buttons) {
         JPanel panel = new JPanel(new GridBagLayout());
         panel.setOpaque(false);
         GridBagConstraints c = new GridBagConstraints();
@@ -150,16 +154,11 @@ public class SourcePanel extends UiTheme.CardPanel {
         panel.add(header, c);
 
         ButtonGroup group = new ButtonGroup();
-        group.add(first);
-        group.add(second);
-        group.add(third);
-
-        c.gridy = 1;
-        panel.add(first, c);
-        c.gridy = 2;
-        panel.add(second, c);
-        c.gridy = 3;
-        panel.add(third, c);
+        for (int index = 0; index < buttons.length; index++) {
+            group.add(buttons[index]);
+            c.gridy = index + 1;
+            panel.add(buttons[index], c);
+        }
         return panel;
     }
 

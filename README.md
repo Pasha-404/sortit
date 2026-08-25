@@ -7,7 +7,7 @@ Settings in `sortit.json`. Works on Windows (embedded runtime included).
 - Source folder + file name pattern (`*.*`, `IMG_*.*`, `PXL_*.*`)
 - Date source: **EXIF/metadata**, **file name**, or **file creation time**
 - Destination folders by template: `YYYY`, `YY`, `MM`, `DD` (separators allowed: `- _ .`)
-- Copy, Move, or Move + archive copy
+- Copy, copy only new files, move, or move + archive copy
 - Automatic cleanup of result logs older than 24 hours
 - No registry; settings and logs saved next to the EXE
 - Language switcher (RU/EN)
@@ -31,7 +31,7 @@ Created on first run next to `SortIt.exe`. Settings from older versions are migr
       "sourceDir": "",
       "filenameTemplate": "*.*",
       "dateSource": "METADATA",  // METADATA | FILENAME | CREATED
-      "mode": "COPY",            // COPY | MOVE | MOVE_ARCHIVE
+      "mode": "COPY",            // COPY | COPY_NEW_ONLY | MOVE | MOVE_ARCHIVE
       "destDir": "",
       "destTemplate": "YYYYMMDD",
       "showResults": true,

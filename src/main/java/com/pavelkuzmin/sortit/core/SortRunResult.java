@@ -6,6 +6,8 @@ public record SortRunResult(
         int processed,
         int total,
         int errors,
+        int skipped,
+        int warnings,
         Path logPath,
         int deletedOldLogs
 ) {

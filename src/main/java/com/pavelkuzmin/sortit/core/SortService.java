@@ -53,6 +53,8 @@ public final class SortService {
         int total = files.size();
         int processed = 0;
         int errors = 0;
+        int skipped = 0;
+        int warnings = 0;
         StringBuilder log = new StringBuilder();
 
         if (deletedOldLogs > 0) {
@@ -61,8 +63,8 @@ public final class SortService {
 
         if (total == 0) {
             notifyProgress(listener, new SortProgress(0, 0, 0));
-            Path logPath = writeLog(resolvedLogDir, finishLog(log, runConfig, processed, total, errors));
-            return new SortRunResult(processed, total, errors, logPath, deletedOldLogs);
+            Path logPath = writeLog(resolvedLogDir, finishLog(log, runConfig, processed, total, errors, skipped, warnings));
+            return new SortRunResult(processed, total, errors, skipped, warnings, logPath, deletedOldLogs);
         }
 
         notifyProgress(listener, new SortProgress(0, total, 0));
@@ -84,7 +86,10 @@ public final class SortService {
                     } else {
                         Path destFolder = resolveSafeFolder(normalizedDestRoot, subFolder);
                         Path bakFolder = resolveSafeFolder(bakRoot, subFolder);
-                        errors += processFile(runConfig.mode, srcFile, destFolder, bakFolder, log);
+                        FileProcessResult fileResult = processFile(runConfig.mode, srcFile, destFolder, bakFolder, log);
+                        errors += fileResult.errors();
+                        skipped += fileResult.skipped();
+                        warnings += fileResult.warnings();
                     }
                 }
             } catch (Exception ex) {
@@ -96,8 +101,8 @@ public final class SortService {
             notifyProgress(listener, new SortProgress(processed, total, errors));
         }
 
-        Path logPath = writeLog(resolvedLogDir, finishLog(log, runConfig, processed, total, errors));
-        return new SortRunResult(processed, total, errors, logPath, deletedOldLogs);
+        Path logPath = writeLog(resolvedLogDir, finishLog(log, runConfig, processed, total, errors, skipped, warnings));
+        return new SortRunResult(processed, total, errors, skipped, warnings, logPath, deletedOldLogs);
     }
 
     public static long countAny(Path dir) {
@@ -220,7 +225,7 @@ public final class SortService {
         return resolved;
     }
 
-    private static int processFile(
+    private static FileProcessResult processFile(
             AppConfig.OperationMode mode,
             Path source,
             Path destFolder,
@@ -230,22 +235,36 @@ public final class SortService {
         String name = source.getFileName().toString();
         Path destPath = destFolder.resolve(name);
 
+        if (Files.exists(destPath) && mode.normalized() == AppConfig.OperationMode.COPY_NEW_ONLY) {
+            if (Files.isRegularFile(destPath) && Files.size(source) == Files.size(destPath)) {
+                logSkipped(log, name, "same name and size already exist at destination: " + destPath);
+                return new FileProcessResult(0, 1, 0);
+            }
+
+            Path renamedDestPath = nextAvailablePath(destPath);
+            Files.createDirectories(destFolder);
+            copyToNewFile(source, renamedDestPath);
+            logWarning(log, name, "different-size file already exists at destination; copied as " + renamedDestPath.getFileName());
+            return new FileProcessResult(0, 0, 1);
+        }
+
         if (Files.exists(destPath)) {
             logError(log, name, "already exists at dest: " + destPath);
-            return 1;
+            return new FileProcessResult(1, 0, 0);
         }
 
         Files.createDirectories(destFolder);
 
         switch (mode.normalized()) {
             case COPY -> copyToNewFile(source, destPath);
+            case COPY_NEW_ONLY -> copyToNewFile(source, destPath);
             case MOVE -> moveToNewFile(source, destPath);
             case MOVE_ARCHIVE -> {
                 Path bakPath = bakFolder.resolve(name);
                 if (Files.exists(bakPath)) {
                     if (!hasSameContent(source, bakPath)) {
                         logError(log, name, "different file already exists in BAK: " + bakPath);
-                        return 1;
+                        return new FileProcessResult(1, 0, 0);
                     }
                 } else {
                     Files.createDirectories(bakFolder);
@@ -256,7 +275,19 @@ public final class SortService {
             case COPY_ARCHIVE -> throw new IllegalStateException("Unexpected legacy mode");
         }
 
-        return 0;
+        return new FileProcessResult(0, 0, 0);
+    }
+
+    private static Path nextAvailablePath(Path target) {
+        String fileName = target.getFileName().toString();
+        int dot = fileName.lastIndexOf('.');
+        String baseName = dot > 0 ? fileName.substring(0, dot) : fileName;
+        String extension = dot > 0 ? fileName.substring(dot) : "";
+
+        for (int suffix = 1; ; suffix++) {
+            Path candidate = target.resolveSibling(baseName + " (" + suffix + ")" + extension);
+            if (!Files.exists(candidate)) return candidate;
+        }
     }
 
     private static void moveToNewFile(Path source, Path target) throws IOException {
@@ -346,11 +377,21 @@ public final class SortService {
         if (listener != null) listener.onProgress(progress);
     }
 
-    private static StringBuilder finishLog(StringBuilder log, AppConfig cfg, int processed, int total, int errors) {
+    private static StringBuilder finishLog(
+            StringBuilder log,
+            AppConfig cfg,
+            int processed,
+            int total,
+            int errors,
+            int skipped,
+            int warnings
+    ) {
         log.append(System.lineSeparator())
                 .append("Template: ").append(cfg.destTemplate).append(System.lineSeparator())
                 .append("Mode: ").append(cfg.mode.normalized()).append(System.lineSeparator())
                 .append("Processed: ").append(processed).append(" / ").append(total)
+                .append(" | Skipped: ").append(skipped)
+                .append(" | Warnings: ").append(warnings)
                 .append(" | Errors: ").append(errors).append(System.lineSeparator());
         return log;
     }
@@ -388,6 +429,16 @@ public final class SortService {
     private static void logError(StringBuilder log, String fileName, String message) {
         log.append("- ERROR: ").append(fileName).append(" - ").append(message).append(System.lineSeparator());
     }
+
+    private static void logWarning(StringBuilder log, String fileName, String message) {
+        log.append("- WARNING: ").append(fileName).append(" - ").append(message).append(System.lineSeparator());
+    }
+
+    private static void logSkipped(StringBuilder log, String fileName, String message) {
+        log.append("- SKIPPED: ").append(fileName).append(" - ").append(message).append(System.lineSeparator());
+    }
+
+    private record FileProcessResult(int errors, int skipped, int warnings) {}
 
     private static String messageOf(Exception ex) {
         String message = ex.getMessage();

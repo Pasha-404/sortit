@@ -32,6 +32,45 @@ class SortServiceTest {
     }
 
     @Test
+    void copyNewOnlySkipsSameNameAndSizeAlreadyInDestination() throws Exception {
+        Path sourceDir = Files.createDirectory(tempDir.resolve("src"));
+        Path destDir = Files.createDirectory(tempDir.resolve("dest"));
+        Path file = Files.writeString(sourceDir.resolve("IMG_20240506.jpg"), "photo");
+        Path existing = Files.createDirectories(destDir.resolve("20240506")).resolve(file.getFileName());
+        Files.writeString(existing, "photo");
+
+        SortRunResult result = new SortService().run(config(sourceDir, destDir, AppConfig.OperationMode.COPY_NEW_ONLY), tempDir, SortService.Messages.english(), null);
+
+        assertEquals(0, result.errors());
+        assertEquals(1, result.skipped());
+        assertEquals(0, result.warnings());
+        assertTrue(Files.exists(file));
+        assertEquals("photo", Files.readString(existing));
+        assertTrue(Files.readString(result.logPath()).contains("SKIPPED: IMG_20240506.jpg"));
+    }
+
+    @Test
+    void copyNewOnlyKeepsBothFilesWhenSameNameHasDifferentSize() throws Exception {
+        Path sourceDir = Files.createDirectory(tempDir.resolve("src"));
+        Path destDir = Files.createDirectory(tempDir.resolve("dest"));
+        Path file = Files.writeString(sourceDir.resolve("IMG_20240506.jpg"), "new photo");
+        Path destinationFolder = Files.createDirectories(destDir.resolve("20240506"));
+        Files.writeString(destinationFolder.resolve(file.getFileName()), "old");
+        Files.writeString(destinationFolder.resolve("IMG_20240506 (1).jpg"), "older");
+
+        SortRunResult result = new SortService().run(config(sourceDir, destDir, AppConfig.OperationMode.COPY_NEW_ONLY), tempDir, SortService.Messages.english(), null);
+
+        assertEquals(0, result.errors());
+        assertEquals(0, result.skipped());
+        assertEquals(1, result.warnings());
+        assertTrue(Files.exists(file));
+        assertEquals("old", Files.readString(destinationFolder.resolve(file.getFileName())));
+        assertEquals("older", Files.readString(destinationFolder.resolve("IMG_20240506 (1).jpg")));
+        assertEquals("new photo", Files.readString(destinationFolder.resolve("IMG_20240506 (2).jpg")));
+        assertTrue(Files.readString(result.logPath()).contains("WARNING: IMG_20240506.jpg"));
+    }
+
+    @Test
     void moveModeMovesToDestinationAndRemovesSource() throws Exception {
         Path sourceDir = Files.createDirectory(tempDir.resolve("src"));
         Path destDir = Files.createDirectory(tempDir.resolve("dest"));
