@@ -50,3 +50,34 @@ jobs:
           path: build/release/*/*
           if-no-files-found: error
           retention-days: 30
+
+  publish-release:
+    name: Publish GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-windows-installer
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v5
+        with:
+          name: SortIt-windows-release
+          path: release
+
+      - name: Create release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          assets=(release/*)
+          test "${#assets[@]}" -eq 3
+
+          gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "SortIt ${GITHUB_REF_NAME#v}" \
+            --notes "Windows installer standard: per-user x64 Setup EXE with embedded Java 21 runtime. Settings are stored in %APPDATA%\\PashaApps\\SortIt and logs in %LOCALAPPDATA%\\PashaApps\\SortIt. This update migrates settings from published SortIt MSI releases before removing the old installer." \
+            --latest
