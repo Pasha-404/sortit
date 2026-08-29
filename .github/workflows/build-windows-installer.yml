@@ -72,8 +72,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          shopt -s nullglob
-          assets=(release/*)
+          mapfile -t assets < <(find release -type f -print | sort)
           test "${#assets[@]}" -eq 3
 
           gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
