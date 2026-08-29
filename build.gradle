@@ -1,3 +1,6 @@
+import groovy.json.JsonOutput
+import java.security.MessageDigest
+
 plugins {
     id 'java'
     id 'application'
@@ -5,11 +8,22 @@ plugins {
 }
 
 group = 'com.pavelkuzmin'
-version = '1.4.0'
+
+def appName = providers.gradleProperty('appName').getOrElse('SortIt')
+def technicalName = providers.gradleProperty('technicalName').getOrElse('SortIt')
+def appId = providers.gradleProperty('appId').getOrElse('f238fccc-4f33-429d-b476-7cd286adb376')
+def publisher = providers.gradleProperty('publisher').getOrElse('Pavel Kuzmin')
+def repositoryUrl = providers.gradleProperty('repositoryUrl').getOrElse('https://github.com/Pasha-404/sortit')
+def releaseDirectory = layout.buildDirectory.dir("release/${project.version}")
+def appImageDirectory = layout.buildDirectory.dir('app-image')
+def appImage = layout.buildDirectory.dir("app-image/${technicalName}")
+def installerFile = layout.buildDirectory.file("release/${project.version}/${technicalName}-Setup-${project.version}-x64.exe")
+def checksumFile = layout.buildDirectory.file("release/${project.version}/${technicalName}-Setup-${project.version}-x64.exe.sha256")
+def manifestFile = layout.buildDirectory.file("release/${project.version}/appfleet-manifest.json")
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(23) // твой JDK 23
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
@@ -26,202 +40,168 @@ dependencies {
 }
 
 application {
-    // Главный класс приложения
     mainClass = 'com.pavelkuzmin.sortit.Main'
 }
 
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
 }
+
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+    options.release = 21
 }
 
 shadowJar {
     archiveBaseName.set('sortit')
-    archiveClassifier.set('')      // без "-all"
-    archiveVersion.set('')         // без версии в имени файла
+    archiveClassifier.set('')
+    archiveVersion.set('')
     mergeServiceFiles()
 }
 
-/**
- * Создаёт portable app-image (папка с SortIt.exe и ВСТРОЕННЫМ runtime).
- * Никаких module-info.java не нужно.
- *
- * Требования: JDK 23 (или 17+) с утилитой jpackage.
- */
-tasks.register('packAppImage', Exec) {
-    dependsOn tasks.shadowJar
+tasks.register('verifyReleaseVersion') {
+    doLast {
+        if (!(project.version.toString() ==~ /0|[1-9]\d*\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?/)) {
+            throw new GradleException("Version '${project.version}' must follow SemVer.")
+        }
+    }
+}
 
-    doFirst {
-        // где лежит jpackage
-        def javaHome = System.getenv('JAVA_HOME')
-        if (!javaHome) javaHome = System.getProperty('java.home')
-        def jpackageExe = file("${javaHome}/bin/jpackage.exe")
-        if (!jpackageExe.exists()) jpackageExe = file("${javaHome}/bin/jpackage")
-        if (!jpackageExe.exists()) {
-            throw new GradleException("jpackage not found in ${javaHome}/bin")
+tasks.register('packAppImage') {
+    dependsOn tasks.shadowJar
+    outputs.dir(appImage)
+
+    doLast {
+        def javaHome = System.getenv('JAVA_HOME') ?: System.getProperty('java.home')
+        def jpackage = file("${javaHome}/bin/jpackage.exe")
+        if (!jpackage.exists()) {
+            jpackage = file("${javaHome}/bin/jpackage")
+        }
+        if (!jpackage.exists()) {
+            throw new GradleException("jpackage was not found in ${javaHome}/bin. Use a full JDK 21 installation.")
         }
 
-        def inputDir = "${buildDir}/libs"
-        def destDir  = "${buildDir}/jpackage"
+        def destination = appImageDirectory.get().asFile
+        project.delete(destination)
+        destination.mkdirs()
 
-        // jlink-опции одной СТРОКОЙ:
-        def jlinkOpts = "--strip-debug --no-header-files --no-man-pages"
-
-        def cmd = [
-                jpackageExe.absolutePath,
+        def command = [
+                jpackage.absolutePath,
                 '--type', 'app-image',
-                '--name', 'SortIt',
-                '--vendor', 'Pavel Kuzmin',
-                '--app-version', project.version,
-                '--input', inputDir,
-                '--dest', destDir,
+                '--name', technicalName,
+                '--app-version', project.version.toString(),
+                '--vendor', publisher,
+                '--input', layout.buildDirectory.dir('libs').get().asFile.absolutePath,
+                '--dest', destination.absolutePath,
                 '--main-jar', 'sortit.jar',
                 '--main-class', application.mainClass.get(),
                 '--add-modules', 'java.base,java.desktop',
-                '--jlink-options', jlinkOpts
+                '--jlink-options', '--strip-debug --no-header-files --no-man-pages'
         ]
 
-        def ico = file('src/main/resources/icons/app.ico')
-        if (ico.exists()) {
-            cmd += ['--icon', ico.absolutePath]
+        def icon = file('src/main/resources/icons/app.ico')
+        if (icon.isFile()) {
+            command += ['--icon', icon.absolutePath]
         }
 
-        commandLine cmd
+        project.exec {
+            commandLine command
+        }
     }
 }
 
-// 1-файловый SFX через WinRAR: извлекает во временную папку и запускает SortIt.exe
-tasks.register('sfxExe', Exec) {
+def findInnoSetupCompiler = {
+    def configured = providers.gradleProperty('innoSetupCompiler').orNull ?: System.getenv('INNO_SETUP_COMPILER')
+    def candidates = []
+    if (configured) {
+        candidates << file(configured)
+    }
+    [System.getenv('ProgramFiles(x86)'), System.getenv('ProgramFiles')]
+            .findAll { it }
+            .each { candidates << file("${it}/Inno Setup 6/ISCC.exe") }
+
+    candidates.find { it.isFile() }
+}
+
+tasks.register('buildInnoSetup') {
     dependsOn tasks.packAppImage
+    inputs.dir(appImage)
+    inputs.file('installer/windows/SortIt.iss')
+    outputs.file(installerFile)
 
-    doFirst {
-        // где WinRAR
-        def wrDirs = [
-                'C:/Program Files/WinRAR',
-                'C:/Program Files (x86)/WinRAR'
-        ].collect { new File(it) }
-        File wrDir = wrDirs.find { it.exists() }
-        if (wrDir == null) throw new GradleException("WinRAR не найден. Установи WinRAR или поправь путь в build.gradle")
+    doLast {
+        def iscc = findInnoSetupCompiler()
+        if (iscc == null) {
+            throw new GradleException('Inno Setup 6 was not found. Install it or set INNO_SETUP_COMPILER to ISCC.exe.')
+        }
 
-        File winrarExe = new File(wrDir, 'WinRAR.exe')
-        if (!winrarExe.exists()) throw new GradleException("WinRAR.exe не найден в ${wrDir}")
+        def output = releaseDirectory.get().asFile
+        project.delete(output)
+        output.mkdirs()
 
-        // папка app-image от jpackage
-        File appImageDir = file("$buildDir/jpackage/SortIt")
-        if (!appImageDir.exists()) throw new GradleException("Нет app-image: ${appImageDir}. Сначала запусти packAppImage")
-
-        // рабочие файлы
-        File outDir = file("$buildDir/sfx")
-        outDir.mkdirs()
-        File comment = new File(outDir, "winrar_sfx_comment.txt")
-        File outExe  = new File(outDir, "SortIt_portable.exe")
-
-        // WinRAR SFX-скрипт
-        def sfxScript = """;The comment below contains SFX script commands
-TempMode
-Setup=SortIt.exe
-Title=SortIt
-Silent=0
-Overwrite=1
-"""
-        // пишем с указанием кодировки строкой
-        comment.setText(sfxScript, "UTF-8")
-
-        // Запаковываем ВСЁ содержимое app-image в один SFX-exe
-        // a = создать архив; -sfx = самораспак.; -ep1 = без ведущих путей; -r = рекурсивно; -inul = тихо; -z = скрипт
-        workingDir appImageDir
-        commandLine(
-                winrarExe.absolutePath,
-                'a', '-sfx', '-ep1', '-r', '-inul',
-                "-z${comment.absolutePath}",
-                outExe.absolutePath,
-                '.' // все файлы из appImageDir
-        )
+        project.exec {
+            commandLine iscc.absolutePath,
+                    "/DAppVersion=${project.version}",
+                    "/DAppName=${appName}",
+                    "/DTechnicalName=${technicalName}",
+                    "/DAppId=${appId}",
+                    "/DPublisher=${publisher}",
+                    "/DRepositoryUrl=${repositoryUrl}",
+                    "/DSourceAppImage=${appImage.get().asFile.absolutePath}",
+                    "/DOutputDir=${output.absolutePath}",
+                    file('installer/windows/SortIt.iss').absolutePath
+        }
     }
 }
 
-// MSI-инсталлятор с UI: выбор папки, ярлыки, меню. Требуется WiX 3.x.
-tasks.register('packMsi', Exec) {
-    dependsOn tasks.shadowJar
+tasks.register('generateReleaseMetadata') {
+    dependsOn tasks.buildInnoSetup
+    inputs.file(installerFile)
+    outputs.files(checksumFile, manifestFile)
 
-    doFirst {
-        // 1) Проверка WiX
-        def wixDirs = [
-                'C:/Program Files (x86)/WiX Toolset v3.11/bin',
-                'C:/Program Files (x86)/WiX Toolset v3.14/bin',
-                'C:/Program Files/WiX Toolset v3.11/bin',
-                'C:/Program Files/WiX Toolset v3.14/bin'
-        ].collect { new File(it) }
-        File wixBin = wixDirs.find { new File(it, 'candle.exe').exists() && new File(it, 'light.exe').exists() }
-        if (!wixBin) throw new GradleException("WiX Toolset не найден. Установи WiX 3.x и перезапусти.")
+    doLast {
+        def installer = installerFile.get().asFile
+        if (!installer.isFile()) {
+            throw new GradleException("Inno Setup output was not found: ${installer}")
+        }
 
-        // 2) jpackage
-        def javaHome = System.getenv('JAVA_HOME') ?: System.getProperty('java.home')
-        File jpackageExe = new File("${javaHome}/bin/jpackage.exe")
-        if (!jpackageExe.exists()) jpackageExe = new File("${javaHome}/bin/jpackage")
-        if (!jpackageExe.exists()) throw new GradleException("jpackage не найден в ${javaHome}/bin")
+        def digest = MessageDigest.getInstance('SHA-256').digest(installer.bytes)
+        def checksum = digest.collect { String.format('%02x', it) }.join()
+        checksumFile.get().asFile.setText("${checksum}  ${installer.name}\n", 'UTF-8')
 
-        // 3) Пути
-        def inputDir = "${buildDir}/libs"
-        def destDir  = "${buildDir}/jpackage"
-
-        // 4) Иконка (опционально)
-        def iconArg = []
-        def ico = file('src/main/resources/icons/app.ico')
-        if (ico.exists()) iconArg = ['--icon', ico.absolutePath]
-
-        // 5) Ресурсы установщика (опционально: лицензия)
-        // Если положишь файл installer/windows/license.rtf — появится экран лицензии.
-        def resArgs = []
-        def resDir = file('installer/windows')
-        if (resDir.exists()) resArgs = ['--resource-dir', resDir.absolutePath]
-        // Папка должна содержать файл license.rtf (RTF-формат)
-
-        // 6) jlink-опции (можно убрать compress, чтобы не было предупреждения)
-        def jlinkOpts = "--strip-debug --no-header-files --no-man-pages"
-
-        // 7) Главный класс
-        def mainCls = project.extensions.getByType(org.gradle.api.plugins.JavaApplication).mainClass.get()
-
-        // 8) Команда
-        def cmd = [
-                jpackageExe.absolutePath,
-                '--type', 'msi',
-                '--name', 'SortIt',
-                '--app-version', project.version,
-                '--vendor', 'Pavel Kuzmin',
-                '--input', inputDir,
-                '--dest', destDir,
-                '--main-jar', 'sortit.jar',
-                '--main-class', mainCls,
-                '--add-modules', 'java.base,java.desktop',
-                '--jlink-options', jlinkOpts,
-
-                // 👉 Видимый UI:
-                '--win-dir-chooser',       // диалог выбора папки установки
-                '--win-menu',              // пункт в меню Пуск
-                '--win-menu-group', 'SortIt',
-                '--win-shortcut',          // ярлык на рабочем столе
-                // Убери строку выше, если ярлык на рабочем столе не нужен
-
-                // Установка "на пользователя" (без UAC-админа). Убери, чтобы попросило админ-права и ставило в Program Files.
-                '--win-per-user-install',
-
-                // Имя папки по умолчанию (в Program Files или в %LOCALAPPDATA%\Programs)
-                '--install-dir', 'SortIt'
-        ] + iconArg + resArgs
-
-        // WiX в PATH на время задачи
-        environment 'PATH', wixBin.absolutePath + File.pathSeparator + System.getenv('PATH')
-
-        commandLine cmd
+        def manifest = [
+                schemaVersion          : 1,
+                appId                  : appId,
+                name                   : appName,
+                technicalName          : technicalName,
+                version                : project.version.toString(),
+                repositoryUrl          : repositoryUrl,
+                platform               : 'windows',
+                architecture           : 'x64',
+                installer              : [
+                        type           : 'inno',
+                        assetName      : installer.name,
+                        sha256AssetName: "${installer.name}.sha256",
+                        silentArgs     : ['/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CLOSEAPPLICATIONS']
+                ],
+                detection              : [
+                        registryKey    : "HKCU\\Software\\PashaApps\\${appId}",
+                        versionValue   : 'Version',
+                        executableValue: 'Executable'
+                ],
+                processNames           : ["${technicalName}.exe"],
+                minimumAppFleetVersion : '1.0.0'
+        ]
+        manifestFile.get().asFile.setText(JsonOutput.prettyPrint(JsonOutput.toJson(manifest)) + '\n', 'UTF-8')
     }
 }
 
+tasks.register('buildWindowsInstaller') {
+    group = 'distribution'
+    description = 'Runs tests and builds the AppFleet-compatible Windows Setup EXE with metadata.'
+    dependsOn tasks.verifyReleaseVersion, tasks.test, tasks.generateReleaseMetadata
+}
 
-// чтобы обычный Build сразу делал exe-образ
 tasks.named('build') {
     dependsOn tasks.packAppImage
 }

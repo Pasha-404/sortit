@@ -15,12 +15,16 @@ class ConfigIOTest {
     Path tempDir;
 
     private final String originalDataDir = System.getProperty("sortit.dataDir");
+    private final String originalConfigDir = System.getProperty("sortit.configDir");
+    private final String originalLogDir = System.getProperty("sortit.logDir");
     private final String originalAppPath = System.getProperty("jpackage.app-path");
     private final String originalUserDir = System.getProperty("user.dir");
 
     @AfterEach
     void restoreProperties() {
         restoreProperty("sortit.dataDir", originalDataDir);
+        restoreProperty("sortit.configDir", originalConfigDir);
+        restoreProperty("sortit.logDir", originalLogDir);
         restoreProperty("jpackage.app-path", originalAppPath);
         restoreProperty("user.dir", originalUserDir);
     }
@@ -53,12 +57,36 @@ class ConfigIOTest {
     }
 
     @Test
-    void packagedAppPathIsUsedWhenNoOverrideExists() {
-        System.clearProperty("sortit.dataDir");
-        Path executable = tempDir.resolve("SortIt.exe");
+    void packagedAppConfigIsMigratedToConfiguredDirectory() throws Exception {
+        Path dataDir = tempDir.resolve("app-data");
+        Path executable = tempDir.resolve("old-install").resolve("SortIt.exe");
+        Files.createDirectories(executable.getParent());
+        Files.writeString(executable.getParent().resolve("sortit.json"), "{\"lang\":\"ru\",\"showResults\":true}");
+        System.setProperty("sortit.dataDir", dataDir.toString());
         System.setProperty("jpackage.app-path", executable.toString());
 
-        assertEquals(tempDir.toAbsolutePath().normalize(), AppPaths.dataDirectory());
+        assertEquals("ru", ConfigIO.load().lang);
+        assertTrue(Files.isRegularFile(dataDir.resolve("sortit.json")));
+    }
+
+    @Test
+    void dataDirectoryOverrideKeepsLogsAndSettingsTogetherForTests() {
+        Path dataDir = tempDir.resolve("app-data");
+        System.setProperty("sortit.dataDir", dataDir.toString());
+
+        assertEquals(dataDir.toAbsolutePath().normalize(), AppPaths.configDirectory());
+        assertEquals(dataDir.toAbsolutePath().normalize(), AppPaths.logDirectory());
+    }
+
+    @Test
+    void defaultDirectoriesUseThePashaAppsConvention() {
+        System.clearProperty("sortit.dataDir");
+        System.clearProperty("sortit.configDir");
+        System.clearProperty("sortit.logDir");
+
+        Path expectedSuffix = Path.of("PashaApps", "SortIt");
+        assertTrue(AppPaths.configDirectory().endsWith(expectedSuffix));
+        assertTrue(AppPaths.logDirectory().endsWith(expectedSuffix));
     }
 
     private static void restoreProperty(String name, String value) {

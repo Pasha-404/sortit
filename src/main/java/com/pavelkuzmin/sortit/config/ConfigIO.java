@@ -22,12 +22,13 @@ public final class ConfigIO {
                 return read(configPath);
             }
 
-            // Preserve settings created by older versions that used the working directory.
-            Path legacyPath = AppPaths.legacyConfigPath();
-            if (!legacyPath.equals(configPath) && Files.isRegularFile(legacyPath)) {
-                AppConfig migrated = read(legacyPath);
-                save(migrated);
-                return migrated;
+            // Preserve settings created before settings moved to the per-user roaming directory.
+            for (Path legacyPath : AppPaths.legacyConfigPaths()) {
+                if (Files.isRegularFile(legacyPath)) {
+                    AppConfig migrated = read(legacyPath);
+                    save(migrated);
+                    return migrated;
+                }
             }
         } catch (Exception ignore) {
             // A broken config must not stop the application from opening.

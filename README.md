@@ -1,61 +1,61 @@
-# SortIt — simple photo/video sorter for Windows
+# SortIt
 
-One-click tool to organize photos/videos into date-based folders.  
-Settings in `sortit.json`. Works on Windows (embedded runtime included).
+SortIt is a one-click Windows tool that organizes photos and videos into date-based folders. It includes its own Java runtime, so Java does not need to be installed separately.
 
-## ✨ Features
-- Source folder + file name pattern (`*.*`, `IMG_*.*`, `PXL_*.*`)
-- Date source: **EXIF/metadata**, **file name**, or **file creation time**
-- Destination folders by template: `YYYY`, `YY`, `MM`, `DD` (separators allowed: `- _ .`)
-- Copy, copy only new files, move, or move + archive copy
-- Automatic cleanup of result logs older than 24 hours
-- No registry; settings and logs saved next to the EXE
-- Language switcher (RU/EN)
+## What it does
 
-## ⬇ Download
-- Portable ZIP — unzip and run SortIt/SortIt.exe
-- MSI Installer — standard Windows installer (Start Menu shortcut, optional desktop shortcut)
-Java is **not** required (runtime included).
+- Selects files directly in a source folder using a name pattern such as `*.*` or `PXL_*.*`.
+- Determines dates from EXIF/metadata, a supported file-name pattern, or file creation time.
+- Creates destination folders from `YYYY`, `YY`, `MM`, and `DD` tokens.
+- Copies files, copies only files not already present, moves files, or moves files while keeping an archive copy.
+- Keeps result logs for 24 hours.
+- Supports English and Russian.
 
-## How to use
-1. Choose **Source** and **Destination** folders.
-2. Set **File name pattern** (e.g., `PXL_*.*`) and **Folder template** (e.g., `YYYYMMDD`).
-3. Pick date source: **EXIF/metadata**, **file name**, or **creation time**.
-4. Click **▶ SortIt**. Optionally show the result log after processing.
+## Install and update
 
-## Settings (`sortit.json`)
-Created on first run next to `SortIt.exe`. Settings from older versions are migrated automatically. Example:
+Download `SortIt-Setup-<version>-x64.exe` from the GitHub release and run it. The installer is per-user and does not require administrator rights. It installs the application under:
 
-    {
-      "lang": "en",
-      "sourceDir": "",
-      "filenameTemplate": "*.*",
-      "dateSource": "METADATA",  // METADATA | FILENAME | CREATED
-      "mode": "COPY",            // COPY | COPY_NEW_ONLY | MOVE | MOVE_ARCHIVE
-      "destDir": "",
-      "destTemplate": "YYYYMMDD",
-      "showResults": true,
-      "windowX": 120,
-      "windowY": 120
-    }
+```
+%LOCALAPPDATA%\Programs\PashaApps\SortIt
+```
 
-## Known limitations
-- **AVCHD/M2TS** often lack embedded creation time → use “file name” or “creation time”.
-- Windows SmartScreen may warn about unknown publisher (unsigned open-source build). Click **More info → Run anyway**.
+Use the same Setup EXE for updates. The installer preserves the installation location and shortcut choice. Its optional desktop shortcut is disabled by default; the Start menu shortcut is always created.
 
-## Troubleshooting
-- **Nothing found** → check the pattern (try `*.*`) and make sure files are directly in the source folder (no recursion).
-- **No metadata found** → switch date source to **file name** or **creation time**.
-- **Conflicting names** → if the target already contains a file with the same name, the operation may fail; check the log.
+The first standard installer update migrates settings from the previous SortIt MSI installation before removing that MSI.
 
-## Roadmap
+## User data
 
-- **More built-in languages**  
-  Expand beyond RU/EN (e.g., DE, ES, FR, IT, UK, PL) with a simple contribution guide for translations.
+Uninstalling SortIt removes only program files and shortcuts. Your settings and logs remain available at:
 
-## Feedback
-Open an **Issue** for bugs/ideas.  
-Screenshots and sample files are welcome!
+```
+Settings: %APPDATA%\PashaApps\SortIt\sortit.json
+Logs:     %LOCALAPPDATA%\PashaApps\SortIt
+```
+
+## Build a Windows release
+
+Requirements: Windows, JDK 21, and Inno Setup 6. The JDK must contain `jpackage`.
+
+```powershell
+.\gradlew.bat clean buildWindowsInstaller
+```
+
+The command runs tests, creates an embedded-runtime application image, builds the installer, and writes exactly these release assets to `build/release/<version>/`:
+
+- `SortIt-Setup-<version>-x64.exe`
+- `SortIt-Setup-<version>-x64.exe.sha256`
+- `appfleet-manifest.json`
+
+The version, stable AppFleet identity, publisher, and repository URL are defined once in `gradle.properties`.
+
+## Usage
+
+1. Choose the source folder.
+2. Open Settings and choose the destination, date source, operation mode, patterns, and result-log preference.
+3. Click `SortIt`.
+
+The source folder is not scanned recursively.
 
 ## License
+
 MIT
